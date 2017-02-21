@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+"""Stormbot main script"""
+
+import logging
+import argparse
+import getpass
+import platform
+
+from stormbot.bot import StormBot
+from stormbot.music import Music
+from stormbot.fortune import Fortune
+
+def main():
+    """Main function"""
+    plugins = [Music, Fortune]
+    jid = "{}@{}/stormbot".format(getpass.getuser(), platform.node())
+
+    parser = argparse.ArgumentParser(description="stormbot executing your orders")
+    parser.add_argument('-v', '--verbose', action='store_true', help="Enable verbose logging")
+    parser.add_argument('--jid', type=str, default=jid,
+                        help="JID to connect with (default: %(default)s)")
+    parser.add_argument('--password', type=str, default=None,
+                        help="Password to connect with (default: promt)")
+    parser.add_argument('room', type=str, help="Room to join (roomname@hostname[/nick])")
+
+    for plugin in plugins:
+        plugin.argparse(parser)
+
+    args = parser.parse_args()
+
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.WARNING)
+
+    password = args.password or getpass.getpass()
+
+    # Init all plugins
+    plugins = [plugin(args) for plugin in plugins]
+
+    bot = StormBot(args.jid, password, args.room, plugins)
+    bot.connect()
+    bot.process(block=True)
+
+
+if __name__ == '__main__':
+    main()
