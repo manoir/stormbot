@@ -9,10 +9,11 @@ import platform
 from stormbot.bot import StormBot
 from stormbot.music import Music
 from stormbot.fortune import Fortune
+from stormbot.say import Say
 
 def main():
     """Main function"""
-    plugins = [Music, Fortune]
+    plugins = [Music, Fortune, Say]
     jid = "{}@{}/stormbot".format(getpass.getuser(), platform.node())
 
     parser = argparse.ArgumentParser(description="stormbot executing your orders")
