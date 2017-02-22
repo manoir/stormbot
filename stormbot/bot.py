@@ -83,16 +83,21 @@ class StormBot(ClientXMPP):
 
     def muc_message(self, msg):
         """Handle received message"""
-        if msg['mucnick'] != self.nick and msg['body'].startswith(self.nick):
-            self.command(msg)
+        if msg['mucnick'] != self.nick:
+            if msg['body'].startswith(self.nick + ':'):
+                try:
+                    self.command(msg)
+                except CommandParserError as e:
+                    self.send_message(mto=msg['from'].bare, mbody=e.message, mtype='groupchat')
+                    self.send_message(mto=msg['from'].bare, mbody=e.usage, mtype='groupchat')
+            elif msg['body'].startswith('all:'):
+                try:
+                    self.command(msg)
+                except CommandParserError as e:
+                    pass
 
     def command(self, msg):
         """Handle a received command"""
-
-        try:
-            args = shlex.split(msg['body'])[1:]
-            args = self.parser.parse_args(args)
-            args.command(self, msg, self.parser, args)
-        except CommandParserError as e:
-            self.send_message(mto=msg['from'].bare, mbody=e.message, mtype='groupchat')
-            self.send_message(mto=msg['from'].bare, mbody=e.usage, mtype='groupchat')
+        args = shlex.split(msg['body'])[1:]
+        args = self.parser.parse_args(args)
+        args.command(self, msg, self.parser, args)
