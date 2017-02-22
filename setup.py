@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(name='Stormbot',
       version='1.0',
@@ -8,7 +8,7 @@ setup(name='Stormbot',
       author='Paul Fariello',
       author_email='paul@fariello.eu',
       url='https://git.paulfariello.fr/Stormbot',
-      py_modules=['stormbot'],
+      packages=find_packages(),
       package_data={'stormbot': ['data/*.dic']},
       scripts=['scripts/stormbot'],
       install_requires=['sleekxmpp', 'dnspython', 'gtts'],
