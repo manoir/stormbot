@@ -24,5 +24,6 @@ class Say(Plugin):
         tts = gTTS(text=args.text, lang=args.lang)
         with NamedTemporaryFile() as f:
             tts.write_to_fp(f)
+            f.flush()
             cmd = ['play', '-t', 'mp3', f.name]
-            subprocess.check_call(cmd)
+            subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
