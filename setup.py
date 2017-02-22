@@ -2,7 +2,7 @@
 
 from setuptools import setup
 
-setup(name='Stormbot',
+setup(name='stormbot',
       version='1.0',
       description='XMPP bot',
       author='Paul Fariello',
