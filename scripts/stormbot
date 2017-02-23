@@ -48,7 +48,7 @@ def main():
             logging.error(e)
 
     for plugin in plugins:
-        plugin.argparse(parser)
+        plugin.argparser(parser)
 
     args = parser.parse_args()
 

@@ -13,12 +13,12 @@ class Plugin(metaclass=ABCMeta):
         pass
 
     @classmethod
-    def argparse(cls, parser):
+    def argparser(cls, parser):
         """Build arg parser for stormbot (run from shell)"""
         pass
 
     @abstractmethod
-    def parser(self, parser):
+    def cmdparser(self, parser, bot):
         """Build command parser for stormbot (in chat)"""
         pass
 
@@ -31,12 +31,13 @@ class Plugin(metaclass=ABCMeta):
 
 class Helper(Plugin):
     """Print help"""
-    def parser(self, parser):
-        subparser = parser.add_parser('help')
+    def cmdparser(self, parser, bot):
+        print(parser)
+        subparser = parser.add_parser('help', bot=bot)
         subparser.set_defaults(command=self.run)
 
     def run(self, bot, msg, parser, *_):
-        bot.send_message(mto=msg['from'].bare, mbody=parser.format_help(), mtype='groupchat')
+        bot.write(parser.format_help())
 
 
 class CommandParserError(Exception):
@@ -45,7 +46,15 @@ class CommandParserError(Exception):
         self.usage = usage
 
 
+class CommandParserAbort(Exception):
+    pass
+
+
 class CommandParser(argparse.ArgumentParser):
+    def __init__(self, bot=None, **_):
+        super().__init__(**_)
+        self.bot = bot
+
     def error(self, message):
         """error(message: string)
 
@@ -53,6 +62,13 @@ class CommandParser(argparse.ArgumentParser):
         """
         raise CommandParserError(message, self.format_usage())
 
+    def print_help(self, *_):
+        self.bot.write(self.format_help())
+
+    def exit(self, status=0, message=None):
+        if message:
+            self.bot.write(message)
+        raise CommandParserAbort(Exception)
 
 class StormBot(ClientXMPP):
     """Storm Bot executing your deepest desires"""
@@ -71,10 +87,11 @@ class StormBot(ClientXMPP):
 
     def init_parser(self):
         self.parser = CommandParser(description="stormbot executing your orders",
-                                    prog=self.nick + ':', add_help=False)
+                                    prog=self.nick + ':', add_help=False,
+                                    bot=self)
         subparsers = self.parser.add_subparsers()
         for plugin in self.plugins:
-            plugin.parser(subparsers)
+            plugin.cmdparser(subparsers, self)
 
     def session_start(self, _):
         """Start an xmpp session"""
@@ -88,8 +105,8 @@ class StormBot(ClientXMPP):
                 try:
                     self.command(msg)
                 except CommandParserError as e:
-                    self.send_message(mto=msg['from'].bare, mbody=e.message, mtype='groupchat')
-                    self.send_message(mto=msg['from'].bare, mbody=e.usage, mtype='groupchat')
+                    self.write(e.message)
+                    self.write(e.usage)
             elif msg['body'].startswith('all:'):
                 try:
                     self.command(msg)
@@ -99,5 +116,11 @@ class StormBot(ClientXMPP):
     def command(self, msg):
         """Handle a received command"""
         args = shlex.split(msg['body'])[1:]
-        args = self.parser.parse_args(args)
-        args.command(self, msg, self.parser, args)
+        try:
+            args = self.parser.parse_args(args)
+            args.command(self, msg, self.parser, args)
+        except CommandParserAbort:
+            pass
+
+    def write(self, string):
+        self.send_message(mto=self.room, mbody=string, mtype='groupchat')
