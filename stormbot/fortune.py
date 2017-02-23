@@ -18,9 +18,16 @@ class Fortune(Plugin):
     def cmdparser(self, parser, bot):
         subparser = parser.add_parser('fortune', bot=bot)
         subparser.set_defaults(command=self.run)
+        subparser.add_argument("--say", dest="say", action="store_true", help="Say the fortune quote")
 
     def random(self):
         return random.choice(self._sentences)
 
-    def run(self, bot, msg, *_):
-        bot.write(self.random())
+    def run(self, bot, msg, parser, args):
+        quote = self.random()
+        if args.say:
+            say_args = ["say" , quote]
+            say_args = parser.parse_args(say_args)
+            say_args.command(bot, msg, parser, say_args)
+        else:
+            bot.write(quote)
