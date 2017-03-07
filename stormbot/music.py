@@ -17,7 +17,6 @@ class Music(Plugin):
         parser.add_argument("--music-default", type=str, default=None, help="Music player (default: %(default)s)")
 
     def safe_path(self, path):
-        path = os.path.join(self.path, path)
         path = os.path.abspath(path)
         common_prefix = os.path.commonpath([path, self.path])
         return common_prefix == self.path
@@ -30,11 +29,14 @@ class Music(Plugin):
                                help="Music to play (default: %(default)s)")
 
     def run(self, bot, msg, parser, args):
-        if not self.safe_path(args.music):
+        music = os.path.join(self.path, args.music)
+        if not self.safe_path(music):
             bot.write("Don't try to mess with me !")
             return
 
+        if not os.path.exists(music):
+            bot.write("You have such shit taste I don't even have this song !")
+
         bot.write("playing your favorite song out loud !")
-        music = os.path.join(self.path, args.music)
         cmd = [self.player, music]
         subprocess.Popen(cmd, stdin=None, stdout=None, stderr=None, close_fds=True)
