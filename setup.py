@@ -2,8 +2,8 @@
 
 from setuptools import setup, find_packages
 
-setup(name='Stormbot',
-      version='1.0',
+setup(name='stormbot',
+      version='1.2',
       description='XMPP bot',
       author='Paul Fariello',
       author_email='paul@fariello.eu',

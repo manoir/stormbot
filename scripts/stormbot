@@ -5,18 +5,18 @@ import logging
 import argparse
 import getpass
 import platform
+import importlib
+import inspect
 
-from stormbot.bot import StormBot
-from stormbot.music import Music
-from stormbot.fortune import Fortune
-from stormbot.say import Say
+from stormbot.bot import StormBot, Plugin
 
 def main():
     """Main function"""
-    plugins = [Music, Fortune, Say]
     jid = "{}@{}/stormbot".format(getpass.getuser(), platform.node())
 
     parser = argparse.ArgumentParser(description="stormbot executing your orders")
+    parser.add_argument('--plugins', default="stormbot.say,stormbot.music,stormbot.fortune",
+                        type=str, help="Comma separated list of plugin to load (default: %(default)s)")
     parser.add_argument('-v', '--verbose', action='store_true', help="Enable verbose logging")
     parser.add_argument('--jid', type=str, default=jid,
                         help="JID to connect with (default: %(default)s)")
@@ -24,21 +24,39 @@ def main():
                         help="Password to connect with (default: promt)")
     parser.add_argument('room', type=str, help="Room to join (roomname@hostname[/nick])")
 
-    for plugin in plugins:
-        plugin.argparse(parser)
-
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()
 
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.WARNING)
 
-    password = args.password or getpass.getpass()
+    # resolve plugins
+    plugins = []
+    for module_name in args.plugins.split(','):
+        try:
+            module = importlib.import_module(module_name)
+            count = 0
+            for _, cls in inspect.getmembers(module, inspect.isclass):
+                if issubclass(cls, Plugin) and cls != Plugin:
+                    logging.info("loading plugin %s.%s", module.__name__, cls.__qualname__)
+                    plugins.append(cls)
+                    count = count + 1
+            if count < 1:
+                logging.warning("no valid stormbot plugin found in %s module", module_name)
+        except ImportError as e:
+            logging.error(e)
+
+    for plugin in plugins:
+        plugin.argparser(parser)
+
+    args = parser.parse_args()
 
     # Init all plugins
     plugins = [plugin(args) for plugin in plugins]
 
+    # Start bot
+    password = args.password or getpass.getpass()
     bot = StormBot(args.jid, password, args.room, plugins)
     bot.connect()
     bot.process(block=True)

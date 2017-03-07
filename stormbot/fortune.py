@@ -1,4 +1,5 @@
 """Fortune for stormbot"""
+import sys
 import random
 import argparse
 from pkg_resources import resource_string
@@ -10,17 +11,25 @@ class Fortune(Plugin):
         self._sentences = args.fortune_dict.decode().splitlines()
 
     @classmethod
-    def argparse(cls, parser):
+    def argparser(cls, parser):
         default_dict = resource_string(__name__, 'data/kaamelott.dic')
         parser.add_argument("--fortune-dict", type=argparse.FileType('r'), default=default_dict,
                             help="Dictionnary to use for fortune (default: kaamelott)")
 
-    def parser(self, parser):
-        subparser = parser.add_parser('fortune')
+    def cmdparser(self, parser, bot):
+        subparser = parser.add_parser('fortune', bot=bot)
         subparser.set_defaults(command=self.run)
+        if 'stormbot.say' in sys.modules:
+            subparser.add_argument("--say", dest="say", action="store_true", help="Say the fortune quote")
 
     def random(self):
         return random.choice(self._sentences)
 
-    def run(self, bot, msg, *_):
-        bot.send_message(mto=msg['from'].bare, mbody=self.random(), mtype='groupchat')
+    def run(self, bot, msg, parser, args):
+        quote = self.random()
+        if args.say:
+            say_args = ["say", quote]
+            say_args = parser.parse_args(say_args)
+            say_args.command(bot, msg, parser, say_args)
+        else:
+            bot.write(quote)
