@@ -9,8 +9,8 @@ from sleekxmpp import ClientXMPP
 
 class Plugin(metaclass=ABCMeta):
     """Abstract plugin to be subclassed for each command of StormBot"""
-    def __init__(self, args=None):
-        pass
+    def __init__(self, bot, args=None):
+        self._bot = bot
 
     @classmethod
     def argparser(cls, parser):
@@ -18,7 +18,7 @@ class Plugin(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def cmdparser(self, parser, bot):
+    def cmdparser(self, parser):
         """Build command parser for stormbot (in chat)"""
         pass
 
@@ -31,13 +31,12 @@ class Plugin(metaclass=ABCMeta):
 
 class Helper(Plugin):
     """Print help"""
-    def cmdparser(self, parser, bot):
-        print(parser)
-        subparser = parser.add_parser('help', bot=bot)
-        subparser.set_defaults(command=self.run)
+    def cmdparser(self, parser):
+        subparser = parser.add_parser('help', bot=self._bot)
+        subparser.set_defaults(command=self.help)
 
-    def run(self, bot, msg, parser, *_):
-        bot.write(parser.format_help())
+    def help(self, msg, parser, *_):
+        self._bot.write(parser.format_help())
 
 
 class CommandParserError(Exception):
@@ -72,31 +71,42 @@ class CommandParser(argparse.ArgumentParser):
 
 class StormBot(ClientXMPP):
     """Storm Bot executing your deepest desires"""
-    def __init__(self, jid, password, room, plugins):
-        super().__init__(jid, password)
-        self.room, _, self.nick = room.partition('/')
+    def __init__(self, args, password, plugins):
+        super().__init__(args.jid, password)
+        self.args = args
+        self.room, _, self.nick = args.room.partition('/')
         self.nick = self.nick or "stormbot"
-        self.plugins = [Helper()] + (plugins or [])
-
-        self.init_parser()
+        self.plugins_cls = [Helper] + (plugins or [])
 
         self.add_event_handler("session_start", self.session_start)
 
         self.register_plugin('xep_0045') # MUC
         self.add_event_handler("groupchat_message", self.muc_message)
+        self.add_event_handler("muc::{}::got_online".format(self.room), self.muc_joined)
 
-    def init_parser(self):
-        self.parser = CommandParser(description="stormbot executing your orders",
-                                    prog=self.nick + ':', add_help=False,
-                                    bot=self)
-        subparsers = self.parser.add_subparsers()
-        for plugin in self.plugins:
-            plugin.cmdparser(subparsers, self)
 
     def session_start(self, _):
         """Start an xmpp session"""
         self.send_presence()
         self.plugin['xep_0045'].joinMUC(self.room, self.nick, wait=True)
+
+    def muc_joined(self, presence):
+        if presence['muc']['nick'] == self.nick:
+            self.write("My dear masters,")
+            # Init all plugins
+            self.plugins = [plugin(self, self.args) for plugin in self.plugins_cls]
+
+            # Init parser
+            self.parser = CommandParser(description="stormbot executing your orders",
+                                        prog=self.nick + ':', add_help=False,
+                                        bot=self)
+            subparsers = self.parser.add_subparsers()
+            for plugin in self.plugins:
+                plugin.cmdparser(subparsers)
+
+            self.write("I'm now ready to execute your deepest desires.")
+        else:
+            self.write("{}: hi !".format(presence['muc']['nick']))
 
     def muc_message(self, msg):
         """Handle received message"""
@@ -118,7 +128,7 @@ class StormBot(ClientXMPP):
         args = shlex.split(msg['body'])[1:]
         try:
             args = self.parser.parse_args(args)
-            args.command(self, msg, self.parser, args)
+            args.command(msg, self.parser, args)
         except CommandParserAbort:
             pass
 
