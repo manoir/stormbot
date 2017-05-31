@@ -52,6 +52,9 @@ class Role:
     def __str__(self):
         return self.name
 
+    def __repr__(self):
+        return self.name
+
 class VolunteerPicker(Plugin):
     def __init__(self, bot, args):
         self._bot = bot
@@ -91,7 +94,7 @@ class VolunteerPicker(Plugin):
         parser.add_argument("--volunteer-all",  action='store_true', default=False, help="Consider all participants as volunteers")
 
     def role(self, rolename):
-        return next((role for role in self.roles if role.name == rolename), None)
+        return next((role for role in self.roles if role.name == rolename), rolename)
 
     def cmdparser(self, parser):
         subparser = parser.add_parser('whois', bot=self._bot)
