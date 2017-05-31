@@ -85,9 +85,11 @@ class Role:
 class VolunteerPicker(Plugin):
     def __init__(self, bot, args):
         self._bot = bot
-        self.roles = [Role("Grand-Pedestre", isodate.parse_datetime("2017-05-29T00"), isodate.parse_duration("P1W")),
-                      Role("Semi-Croustillant", isodate.parse_datetime("2017-05-29T11:45"), isodate.parse_duration("PT24H"))]
         self.args = args
+        self.roles = []
+        for index, role in enumerate(args.volunteer_role):
+            self.roles.append(Role(role, args.volunteer_role_start[index], args.volunteer_role_duration[index]))
+        self.actors = {}
         if self.args.volunteer_all:
             roster = list(self._bot.plugin['xep_0045'].getRoster(self._bot.room))
             self.volunteers = {role: [Volunteer(name, role) for name in roster if name != self._bot.nick]
@@ -118,7 +120,10 @@ class VolunteerPicker(Plugin):
 
     @classmethod
     def argparser(cls, parser):
-        parser.add_argument("--volunteer-all",  action='store_true', default=False, help="Consider all participants as volunteers")
+        parser.add_argument("--volunteer-all", action='store_true', default=False, help="Consider all participants as volunteers")
+        parser.add_argument("--volunteer-role", type=str, action='append')
+        parser.add_argument("--volunteer-role-start", type=isodate.parse_datetime, action='append')
+        parser.add_argument("--volunteer-role-duration", type=isodate.parse_duration, action='append')
 
     def role(self, rolename):
         return next((role for role in self.roles if role.name == rolename), rolename)
