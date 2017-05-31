@@ -17,6 +17,15 @@ class Volunteer:
     def __str__(self):
         return self.name
 
+    def __hash__(self):
+        return hash((self.name, self.role))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and (self.name, self.role) == (other.name, other.role)
+
+    def __ne__(self, other):
+        return not (self == other)
+
 class Actor:
     def __init__(self, volunteer):
         self.volunteer = volunteer
@@ -39,6 +48,15 @@ class Actor:
     def __str__(self):
         return self.name
 
+    def __hash__(self):
+        return hash((self.volunteer, self.start))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and (self.volunteer, self.start) == (other.volunteer, other.start)
+
+    def __ne__(self, other):
+        return not (self == other)
+
 class Role:
     def __init__(self, name, start, duration):
         self.name = name
@@ -54,6 +72,15 @@ class Role:
 
     def __repr__(self):
         return self.name
+
+    def __hash__(self):
+        return hash(self.name)
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.name == other.name
+
+    def __ne__(self, other):
+        return not (self == other)
 
 class VolunteerPicker(Plugin):
     def __init__(self, bot, args):
@@ -118,7 +145,8 @@ class VolunteerPicker(Plugin):
 
     def iam(self, msg, parser, args):
         volunteer = Volunteer(msg['mucnick'], args.role)
-        self.volunteers[args.role].append(volunteer)
+        if volunteer not in self.volunteers[args.role]:
+            self.volunteers[args.role].append(volunteer)
         self._bot.write("{}: thanks !".format(volunteer.name))
         if args.role in self.actors:
             self._bot.write("{}: you are no longer {} thanks to {}".format(self.actors[args.role],
@@ -132,9 +160,12 @@ class VolunteerPicker(Plugin):
 
     def icouldbe(self, msg, parser, args):
         volunteer = Volunteer(msg['mucnick'], args.role)
-        self.volunteers[args.role].append(volunteer)
-        self._bot.write("{}: glad to here that".format(msg['mucnick']))
-        self.write_volunteers(args.role)
+        if volunteer not in self.volunteers[args.role]:
+            self.volunteers[args.role].append(volunteer)
+            self._bot.write("{}: glad to here that".format(msg['mucnick']))
+            self.write_volunteers(args.role)
+        else:
+            self._bot.write("{}: you already volunteered for {}".format(msg['mucnick'], args.role))
 
     def pick(self, role):
         volunteer = random.choice(self.volunteers[role])
