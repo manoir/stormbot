@@ -3,6 +3,7 @@ import math
 import isodate
 import datetime
 import random
+import pickle
 
 from .bot import Plugin
 
@@ -96,7 +97,17 @@ class VolunteerPicker(Plugin):
                                for role in self.roles}
         else:
             self.volunteers = {role: [] for role in self.roles}
-        self.actors = {}
+
+        try:
+            with open(self.args.volunteer_cache, 'rb') as cache:
+                cache = pickle.load(cache)
+            if "actors" in cache:
+                for cached_role, cached_actor in cache["actors"].items():
+                    if cached_role in self.roles:
+                        self.actors[cached_role] = cached_actor
+        except (IOError, pickle.PickleError):
+            pass
+
         random.seed()
 
         for role in self.roles:
@@ -121,6 +132,7 @@ class VolunteerPicker(Plugin):
     @classmethod
     def argparser(cls, parser):
         parser.add_argument("--volunteer-all", action='store_true', default=False, help="Consider all participants as volunteers")
+        parser.add_argument("--volunteer-cache", type=str, default="/var/cache/stormbot/volunteer.p", help="Cache file (default: %(default)s)")
         parser.add_argument("--volunteer-role", type=str, action='append')
         parser.add_argument("--volunteer-role-start", type=isodate.parse_datetime, action='append')
         parser.add_argument("--volunteer-role-duration", type=isodate.parse_duration, action='append')
@@ -143,8 +155,12 @@ class VolunteerPicker(Plugin):
         subparser.add_argument("role", type=self.role, help="Role to be volunteer for", choices=self.roles)
 
     def whois(self, msg, parser, args):
-        if not args.role in self.actors:
-            self.pick(args.role)
+        if not args.role in self.actors or self.actors[args.role].remaining < datetime.timedelta(0):
+            if len(self.volunteers[args.role]) < 1:
+                self._bot.write("nobody is willing to be {}".format(args.role))
+                return
+
+            self.pick(random.choice(self.volunteers[role]))
 
         self.write_actors(args.role)
 
@@ -157,7 +173,7 @@ class VolunteerPicker(Plugin):
             self._bot.write("{}: you are no longer {} thanks to {}".format(self.actors[args.role],
                                                                            args.role,
                                                                            volunteer))
-        self.actors[args.role] = volunteer.appoint()
+        self.pick(volunteer)
         self.write_actors(args.role)
 
     def whocouldbe(self, msg, parser, args):
@@ -172,7 +188,10 @@ class VolunteerPicker(Plugin):
         else:
             self._bot.write("{}: you already volunteered for {}".format(msg['mucnick'], args.role))
 
-    def pick(self, role):
-        volunteer = random.choice(self.volunteers[role])
-
-        self.actors[role] = volunteer.appoint()
+    def pick(self, volunteer):
+        self.actors[volunteer.role] = volunteer.appoint()
+        try:
+            with open(self.args.volunteer_cache, 'wb') as cache:
+                pickle.dump({"actors": self.actors}, cache)
+        except IOError as err:
+            print("can't cache choosen actor: {}".format(err))
