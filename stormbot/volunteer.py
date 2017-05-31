@@ -57,7 +57,8 @@ class VolunteerPicker(Plugin):
         self._bot = bot
         self.roles = [Role("Grand-Pedestre", isodate.parse_datetime("2017-05-29T00"), isodate.parse_duration("P1W")),
                       Role("Semi-Croustillant", isodate.parse_datetime("2017-05-29T11:45"), isodate.parse_duration("PT24H"))]
-        if args.volunteer_all:
+        self.args = args
+        if self.args.volunteer_all:
             roster = list(self._bot.plugin['xep_0045'].getRoster(self._bot.room))
             self.volunteers = {role: [Volunteer(name, role) for name in roster if name != self._bot.nick]
                                for role in self.roles}
@@ -68,6 +69,11 @@ class VolunteerPicker(Plugin):
 
         for role in self.roles:
             self.write_volunteers(role)
+
+    def got_online(self, presence):
+        if self.args.volunteer_all:
+            for role in self.roles:
+                self.volunteers[role].append(Volunteer(presence['muc']['nick'], role))
 
     def write_volunteers(self, role):
         volunteers = self.volunteers[role]

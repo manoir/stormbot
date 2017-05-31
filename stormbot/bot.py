@@ -12,6 +12,9 @@ class Plugin(metaclass=ABCMeta):
     def __init__(self, bot, args=None):
         self._bot = bot
 
+    def got_online(self, presence):
+        pass
+
     @classmethod
     def argparser(cls, parser):
         """Build arg parser for stormbot (run from shell)"""
@@ -70,12 +73,13 @@ class StormBot(ClientXMPP):
         self.room, _, self.nick = args.room.partition('/')
         self.nick = self.nick or "stormbot"
         self.plugins_cls = [Helper] + (plugins or [])
+        self.plugins = []
 
         self.add_event_handler("session_start", self.session_start)
 
         self.register_plugin('xep_0045') # MUC
         self.add_event_handler("groupchat_message", self.muc_message)
-        self.add_event_handler("muc::{}::got_online".format(self.room), self.muc_joined)
+        self.add_event_handler("muc::{}::got_online".format(self.room), self.got_online)
 
 
     def session_start(self, _):
@@ -83,7 +87,7 @@ class StormBot(ClientXMPP):
         self.send_presence()
         self.plugin['xep_0045'].joinMUC(self.room, self.nick, wait=True)
 
-    def muc_joined(self, presence):
+    def got_online(self, presence):
         if presence['muc']['nick'] == self.nick:
             self.write("My dear masters,")
             # Init all plugins
@@ -99,7 +103,8 @@ class StormBot(ClientXMPP):
 
             self.write("I'm now ready to execute your deepest desires.")
         else:
-            self.write("{}: hi !".format(presence['muc']['nick']))
+            for plugin in self.plugins:
+                plugin.got_online(presence)
 
     def muc_message(self, msg):
         """Handle received message"""
