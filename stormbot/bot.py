@@ -22,13 +22,6 @@ class Plugin(metaclass=ABCMeta):
         """Build command parser for stormbot (in chat)"""
         pass
 
-    @classmethod
-    @abstractmethod
-    def run(self, bot, msg, parser, args):
-        """Run this specific plugin"""
-        pass
-
-
 class Helper(Plugin):
     """Print help"""
     def cmdparser(self, parser):
