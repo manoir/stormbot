@@ -1,9 +1,11 @@
 """Picked volunteer for stormbot"""
+import os
 import math
 import isodate
 import datetime
 import random
 import pickle
+import collections
 
 from .bot import Plugin
 
@@ -83,30 +85,93 @@ class Role:
     def __ne__(self, other):
         return not (self == other)
 
+class ListProxy(collections.abc.MutableSequence):
+    def __init__(self, storage, cache=None):
+        self._storage = storage
+        self._cache = cache or []
+
+    def __getitem__(self, index):
+        return self._cache.__getitem__(index)
+
+    def __setitem__(self, index, value):
+        self._cache.__setitem__(index, self._storage.proxy(value))
+        self._storage.dump()
+
+    def __delitem__(self, index):
+        self._cache.__delitem__(index)
+        self._storage.dump()
+
+    def insert(self, index, value):
+        return self._cache.insert(index, value)
+
+    def __len__(self):
+        return self._cache.__len__()
+
+class DictProxy(collections.abc.MutableMapping):
+    def __init__(self, storage, cache=None):
+        self._storage = storage
+        self._cache = cache or {}
+
+    def __getitem__(self, key):
+        return self._cache.__getitem__(key)
+
+    def __setitem__(self, key, value):
+        self._cache.__setitem__(key, self._storage.proxy(value))
+        self._storage.dump()
+
+    def __delitem__(self, key):
+        self._cache.__delitem__(key)
+        self._storage.dump()
+
+    def __iter__(self):
+        return self._cache.__iter__()
+
+    def __len__(self):
+        return self._cache.__len__()
+
+class Storage(DictProxy):
+    def __init__(self, path):
+        super().__init__(self)
+        self.path = path
+        if os.path.isfile(self.path):
+            with open(self.path, 'rb') as cachefile:
+                self._cache = pickle.load(cachefile)
+
+    def proxy(self, value):
+        if isinstance(value, list):
+            return ListProxy(self, value)
+        if isinstance(value, dict):
+            return DictProxy(self, value)
+        return value
+
+    def dump(self):
+        with open(self.path, 'wb') as cachefile:
+            pickle.dump(self._cache, cachefile)
+
 class VolunteerPicker(Plugin):
     def __init__(self, bot, args):
         self._bot = bot
         self.args = args
+        self._cache = Storage(self.args.volunteer_cache)
+        if "actors" not in self._cache:
+            self._cache["actors"] = {}
+        self.actors = self._cache["actors"]
+        if "volunteers" not in self._cache:
+            self._cache["volunteers"] = {}
+        self.volunteers = self._cache["volunteers"]
+
         self.roles = []
         for index, role in enumerate(args.volunteer_role):
             self.roles.append(Role(role, args.volunteer_role_start[index], args.volunteer_role_duration[index]))
-        self.actors = {}
-        if self.args.volunteer_all:
-            roster = list(self._bot.plugin['xep_0045'].getRoster(self._bot.room))
-            self.volunteers = {role: [Volunteer(name, role) for name in roster if name != self._bot.nick]
-                               for role in self.roles}
-        else:
-            self.volunteers = {role: [] for role in self.roles}
 
-        try:
-            with open(self.args.volunteer_cache, 'rb') as cache:
-                cache = pickle.load(cache)
-            if "actors" in cache:
-                for cached_role, cached_actor in cache["actors"].items():
-                    if cached_role in self.roles:
-                        self.actors[cached_role] = cached_actor
-        except (IOError, pickle.PickleError):
-            pass
+        roster = list(self._bot.plugin['xep_0045'].getRoster(self._bot.room))
+        for role in self.roles:
+            if role not in self.volunteers:
+                self.volunteers[role] = []
+            if self.args.volunteer_all:
+                for name in roster:
+                    if name != self._bot.nick:
+                        self.volunteers[role].append(Volunteer(name, role))
 
         random.seed()
 
@@ -152,6 +217,8 @@ class VolunteerPicker(Plugin):
         subparser.add_argument("role", type=self.role, help="Role to be volunteer for", choices=self.roles)
         subparser = parser.add_parser('icouldbe', bot=self._bot)
         subparser.set_defaults(command=self.icouldbe)
+        subparser = parser.add_parser('icantbe', bot=self._bot)
+        subparser.set_defaults(command=self.icantbe)
         subparser.add_argument("role", type=self.role, help="Role to be volunteer for", choices=self.roles)
 
     def whois(self, msg, parser, args):
@@ -160,7 +227,7 @@ class VolunteerPicker(Plugin):
                 self._bot.write("nobody is willing to be {}".format(args.role))
                 return
 
-            self.pick(random.choice(self.volunteers[role]))
+            self.pick(random.choice(self.volunteers[args.role]))
 
         self.write_actors(args.role)
 
@@ -188,10 +255,14 @@ class VolunteerPicker(Plugin):
         else:
             self._bot.write("{}: you already volunteered for {}".format(msg['mucnick'], args.role))
 
+    def icantbe(self, msg, parser, args):
+        volunteer = Volunteer(msg['mucnick'], args.role)
+        if volunteer in self.volunteers[args.role]:
+            self.volunteers[args.role].remove(volunteer)
+            self._bot.write("{}: sad news…".format(msg['mucnick']))
+            self.write_volunteers(args.role)
+        else:
+            self._bot.write("{}: I know, I know, you can't be {}".format(msg['mucnick'], args.role))
+
     def pick(self, volunteer):
         self.actors[volunteer.role] = volunteer.appoint()
-        try:
-            with open(self.args.volunteer_cache, 'wb') as cache:
-                pickle.dump({"actors": self.actors}, cache)
-        except IOError as err:
-            print("can't cache choosen actor: {}".format(err))
