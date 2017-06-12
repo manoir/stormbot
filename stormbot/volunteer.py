@@ -208,18 +208,23 @@ class VolunteerPicker(Plugin):
     def cmdparser(self, parser):
         subparser = parser.add_parser('whois', bot=self._bot)
         subparser.set_defaults(command=self.whois)
-        subparser.add_argument("role", type=self.role, help="Role to be volunteer for", choices=self.roles)
+        subparser.add_argument("role", type=self.role, choices=self.roles)
+
         subparser = parser.add_parser('iam', bot=self._bot)
         subparser.set_defaults(command=self.iam)
-        subparser.add_argument("role", type=self.role, help="Role to be volunteer for", choices=self.roles)
+        subparser.add_argument("role", type=self.role, choices=self.roles)
+
         subparser = parser.add_parser('whocouldbe', bot=self._bot)
         subparser.set_defaults(command=self.whocouldbe)
-        subparser.add_argument("role", type=self.role, help="Role to be volunteer for", choices=self.roles)
+        subparser.add_argument("role", type=self.role, choices=self.roles)
+
         subparser = parser.add_parser('icouldbe', bot=self._bot)
         subparser.set_defaults(command=self.icouldbe)
+        subparser.add_argument("role", type=self.role, choices=self.roles)
+
         subparser = parser.add_parser('icantbe', bot=self._bot)
         subparser.set_defaults(command=self.icantbe)
-        subparser.add_argument("role", type=self.role, help="Role to be volunteer for", choices=self.roles)
+        subparser.add_argument("role", type=self.role, choices=self.roles)
 
     def whois(self, msg, parser, args):
         if not args.role in self.actors or self.actors[args.role].remaining < datetime.timedelta(0):
