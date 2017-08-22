@@ -5,8 +5,7 @@ import logging
 import argparse
 import getpass
 import platform
-import importlib
-import inspect
+import pkg_resources
 
 from stormbot.bot import StormBot, Plugin
 
@@ -33,19 +32,9 @@ def main():
 
     # resolve plugins
     plugins = []
-    for module_name in args.plugins.split(','):
-        try:
-            module = importlib.import_module(module_name)
-            count = 0
-            for _, cls in inspect.getmembers(module, inspect.isclass):
-                if issubclass(cls, Plugin) and cls != Plugin:
-                    logging.info("loading plugin %s.%s", module.__name__, cls.__qualname__)
-                    plugins.append(cls)
-                    count = count + 1
-            if count < 1:
-                logging.warning("no valid stormbot plugin found in %s module", module_name)
-        except ImportError as e:
-            logging.error(e)
+    for plugin in args.plugins.split(','):
+        module, name = plugin.rsplit('.', maxsplit=1)
+        plugins.append(pkg_resources.load_entry_point(module, "stormbot.plugins", name))
 
     for plugin in plugins:
         plugin.argparser(parser)
@@ -58,6 +47,10 @@ def main():
     bot.connect()
     bot.process(block=True)
 
+def list_plugins():
+    """Print list of available stormbot plugin to stdout"""
+    for entry_point in pkg_resources.iter_entry_points('stormbot.plugins'):
+        print("{}.{}".format(entry_point.module_name, entry_point.name))
 
 if __name__ == '__main__':
     main()
