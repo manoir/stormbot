@@ -52,12 +52,9 @@ def main():
 
     args = parser.parse_args()
 
-    # Init all plugins
-    plugins = [plugin(args) for plugin in plugins]
-
     # Start bot
     password = args.password or getpass.getpass()
-    bot = StormBot(args.jid, password, args.room, plugins)
+    bot = StormBot(args, password, plugins)
     bot.connect()
     bot.process(block=True)
 

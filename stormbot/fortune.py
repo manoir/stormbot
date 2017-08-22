@@ -7,7 +7,8 @@ from pkg_resources import resource_string
 from .bot import Plugin
 
 class Fortune(Plugin):
-    def __init__(self, args):
+    def __init__(self, bot, args):
+        self._bot = bot
         self._sentences = args.fortune_dict.decode().splitlines()
 
     @classmethod
@@ -16,8 +17,8 @@ class Fortune(Plugin):
         parser.add_argument("--fortune-dict", type=argparse.FileType('r'), default=default_dict,
                             help="Dictionnary to use for fortune (default: kaamelott)")
 
-    def cmdparser(self, parser, bot):
-        subparser = parser.add_parser('fortune', bot=bot)
+    def cmdparser(self, parser):
+        subparser = parser.add_parser('fortune', bot=self._bot)
         subparser.set_defaults(command=self.run)
         if 'stormbot.say' in sys.modules:
             subparser.add_argument("--say", dest="say", action="store_true", help="Say the fortune quote")
@@ -25,11 +26,11 @@ class Fortune(Plugin):
     def random(self):
         return random.choice(self._sentences)
 
-    def run(self, bot, msg, parser, args):
+    def run(self, msg, parser, args):
         quote = self.random()
         if args.say:
             say_args = ["say", quote]
             say_args = parser.parse_args(say_args)
-            say_args.command(bot, msg, parser, say_args)
+            say_args.command(msg, parser, say_args)
         else:
-            bot.write(quote)
+            self._bot.write(quote)

@@ -5,7 +5,8 @@ from .bot import Plugin
 
 
 class Music(Plugin):
-    def __init__(self, args):
+    def __init__(self, bot, args):
+        self._bot = bot
         self.player = args.music_player
         self.path = os.path.abspath(args.music_path)
         self.default = args.music_default
@@ -21,22 +22,22 @@ class Music(Plugin):
         common_prefix = os.path.commonpath([path, self.path])
         return common_prefix == self.path
 
-    def cmdparser(self, parser, bot):
-        subparser = parser.add_parser('music', bot=bot)
+    def cmdparser(self, parser):
+        subparser = parser.add_parser('music', bot=self._bot)
         subparser.set_defaults(command=self.run)
         subparser.add_argument("--volume", type=int, default=65536, help="Music player volume (default: %(default)i)")
         subparser.add_argument("music", type=str, nargs='?', default=self.default,
                                help="Music to play (default: %(default)s)")
 
-    def run(self, bot, msg, parser, args):
+    def run(self, msg, parser, args):
         music = os.path.join(self.path, args.music)
         if not self.safe_path(music):
-            bot.write("Don't try to mess with me !")
+            self._bot.write("Don't try to mess with me !")
             return
 
         if not os.path.exists(music):
-            bot.write("You have such shit taste I don't even have this song !")
+            self._bot.write("You have such shit taste I don't even have this song !")
 
-        bot.write("playing your favorite song out loud !")
+        self._bot.write("playing your favorite song out loud !")
         cmd = [self.player, music]
         subprocess.Popen(cmd, stdin=None, stdout=None, stderr=None, close_fds=True)
