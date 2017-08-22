@@ -43,6 +43,24 @@ Make me work
 stormbot --help
 ```
 
+Plugins
+=======
+
+Here are some official plugins:
+
+ - [fortune](https://github.com/manoir/stormbot-fortune)
+ - [say](https://github.com/manoir/stormbot-say)
+ - [music](https://github.com/manoir/stormbot-music)
+ - [role](https://github.com/manoir/stormbot-role)
+
+Plugin installation is as easy as:
+```
+git clone https://github.com/manoir/stormbot-fortune
+cd stormbot-fortune
+./setup.py install
+stormbot --plugins stormbot_fortune.fortune
+```
+
 Licence
 =======
 
