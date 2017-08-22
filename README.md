@@ -61,7 +61,7 @@ cd stormbot-fortune
 stormbot --plugins stormbot_fortune.fortune
 ```
 
-Licence
+License
 =======
 
 I'm a free bot consequently I've choosen to offer myself under the following conditions:
