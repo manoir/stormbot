@@ -13,8 +13,13 @@ def main():
     """Main function"""
     jid = "{}@{}/stormbot".format(getpass.getuser(), platform.node())
 
+    default_plugins = []
+    for entry_point in pkg_resources.iter_entry_points("stormbot.plugins"):
+        for attr in entry_point.attrs:
+            default_plugins.append("{}.{}".format(entry_point.module_name, attr))
+
     parser = argparse.ArgumentParser(description="stormbot executing your orders")
-    parser.add_argument('--plugins', default="stormbot.say,stormbot.music,stormbot.fortune",
+    parser.add_argument('--plugins', default=",".join(default_plugins),
                         type=str, help="Comma separated list of plugin to load (default: %(default)s)")
     parser.add_argument('-v', '--verbose', action='store_true', help="Enable verbose logging")
     parser.add_argument('--jid', type=str, default=jid,
