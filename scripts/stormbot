@@ -37,9 +37,10 @@ def main():
 
     # resolve plugins
     plugins = []
-    for plugin in args.plugins.split(','):
-        module, name = plugin.rsplit('.', maxsplit=1)
-        plugins.append(pkg_resources.load_entry_point(module, "stormbot.plugins", name))
+    if len(args.plugins) > 0:
+        for plugin in args.plugins.split(','):
+            module, name = plugin.rsplit('.', maxsplit=1)
+            plugins.append(pkg_resources.load_entry_point(module, "stormbot.plugins", name))
 
     for plugin in plugins:
         plugin.argparser(parser)
