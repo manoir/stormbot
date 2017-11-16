@@ -1,3 +1,3 @@
-build
-dist
-stormbot.egg-info
+build/*
+dist/*
+*.egg-info/*
