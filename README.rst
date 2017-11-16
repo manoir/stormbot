@@ -51,11 +51,13 @@ Here are some official plugins:
 * say_
 * music_
 * role_
+* yocto-alert_
 
 .. _fortune: https://pypi.org/project/stormbot-fortune
 .. _role: https://pypi.org/project/stormbot-role
 .. _music: https://pypi.org/project/stormbot-music
 .. _say: https://pypi.org/project/stormbot-say
+.. _yocto-alert: https://pypi.org/project/stormbot-yocto-alert
 
 Plugin installation is as easy as::
 
