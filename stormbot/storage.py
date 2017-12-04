@@ -19,7 +19,9 @@ class ListProxy(collections.abc.MutableSequence):
         self._storage.dump()
 
     def insert(self, index, value):
-        return self._cache.insert(index, value)
+        ret = self._cache.insert(index, value)
+        self._storage.dump()
+        return ret
 
     def __len__(self):
         return self._cache.__len__()
