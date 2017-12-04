@@ -132,3 +132,20 @@ class StormBot(ClientXMPP):
 
     def write(self, string):
         self.send_message(mto=self.room, mbody=string, mtype='groupchat')
+
+class Fakebot:
+    def write(sef, *args, **kwargs):
+        print(*args, **kwargs)
+
+def main(cls):
+    argparser = argparse.ArgumentParser()
+    cls.argparser(argparser)
+    argparser.add_argument(dest="_", nargs='*')
+    args = argparser.parse_args()
+    plugin = cls(Fakebot(), args)
+
+    parser = CommandParser()
+    subparser = parser.add_subparsers()
+    plugin.cmdparser(subparser)
+    args = parser.parse_args(args._)
+    plugin.run("todo", parser, args)
