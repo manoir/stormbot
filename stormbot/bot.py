@@ -3,6 +3,7 @@ Main bot of stormbot
 """
 import argparse
 import shlex
+import re
 
 from abc import ABCMeta, abstractmethod
 from sleekxmpp import ClientXMPP
@@ -23,6 +24,9 @@ class Plugin(metaclass=ABCMeta):
     @abstractmethod
     def cmdparser(self, parser):
         """Build command parser for stormbot (in chat)"""
+        pass
+
+    def message(self, nick, msg):
         pass
 
 class Helper(Plugin):
@@ -74,6 +78,7 @@ class StormBot(ClientXMPP):
         self.nick = self.nick or "stormbot"
         self.plugins_cls = [Helper] + (plugins or [])
         self.plugins = []
+        self.subscriptions = {}
 
         self.add_event_handler("session_start", self.session_start)
 
@@ -120,6 +125,14 @@ class StormBot(ClientXMPP):
                     self.command(msg)
                 except CommandParserError as e:
                     pass
+            else:
+                match = re.search("^([^ :]+):", msg['body'])
+                if match is None:
+                    return
+
+                nick = match.group(1)
+                for plugin in self.subscriptions.get(nick, []):
+                    plugin.message(nick, msg)
 
     def command(self, msg):
         """Handle a received command"""
@@ -132,6 +145,11 @@ class StormBot(ClientXMPP):
 
     def write(self, string):
         self.send_message(mto=self.room, mbody=string, mtype='groupchat')
+
+    def subscribe(self, nick, plugin):
+        if nick not in self.subscriptions:
+            self.subscriptions[nick] = []
+        self.subscriptions[nick].append(plugin)
 
 class Fakebot:
     def write(sef, *args, **kwargs):
