@@ -1,0 +1,120 @@
+[MASTER]
+ignore=test,verify_sigs
+
+[MESSAGES CONTROL]
+disable=all
+enable=	# Logging
+		logging-too-few-args,
+		logging-not-lazy,
+		logging-too-many-args,
+
+		# Format
+		bad-continuation,
+		bad-indentation,
+		bad-whitespace,
+		line-too-long,
+		syntax-error,
+		mixed-indentation,
+		mixed-line-endings,
+		trailing-whitespace,
+		redefined-builtin,
+
+		# Variables
+		undefined-loop-variable,
+		undefined-variable,
+		unused-variable,
+		used-before-assignment,
+
+		# Functions
+		assignment-from-no-return,
+		dangerous-default-value,
+		duplicate-argument-name,
+		function-redefined,
+		no-value-for-parameter,
+		redundant-keyword-arg,
+		return-outside-function,
+		too-many-function-args,
+		unused-argument,
+		yield-outside-function,
+		not-callable,
+
+		# Classes
+		abstract-class-instantiated,
+		old-style-class,
+		return-in-init,
+		no-member,
+
+		# Sequences
+		bad-reversed-sequence,
+		invalid-sequence-index,
+		invalid-slice-index,
+		missing-reversed-argument,
+		unpacking-non-sequence,
+
+		# Imports
+		cyclic-import,
+		deprecated-module,
+		import-self,
+		import-error,
+		no-name-in-module,
+		reimported,
+		relative-import,
+		unused-import,
+		wildcard-import,
+
+		# Exceptions
+		bad-except-order,
+		catching-non-exception,
+		lost-exception,
+		notimplemented-raised,
+		pointless-except,
+		raising-bad-type,
+
+		# Misc
+		assert-on-tuple,
+		bad-open-mode,
+		boolean-datetime,
+		nonexistent-operator,
+		not-in-loop,
+		unreachable,
+		unnecessary-semicolon,
+
+
+[REPORTS]
+
+[VARIABLES]
+
+[SIMILARITIES]
+
+[MISCELLANEOUS]
+
+[TYPECHECK]
+ignored-modules=bottle
+
+[BASIC]
+function-rgx=(test_)|([a-z_][a-z0-9_]{0,30})$
+variable-rgx=[a-z_][a-z0-9_]{0,30}$
+const-rgx=(([A-Z_][A-Z0-9_]*)|(__.*__))$
+attr-rgx=[a-z_][a-z0-9_]{0,30}$
+argument-rgx=[a-z_][a-z0-9_]{0,30}$
+class-attribute-rgx=([A-Za-z_][A-Za-z0-9_]{0,30}|(__.*__))$
+inlinevar-rgx=[A-Za-z_][A-Za-z0-9_]*$
+class-rgx=[A-Z_][a-zA-Z0-9]+$
+module-rgx=(([a-z_][a-z0-9_]*)|([A-Z][a-zA-Z0-9]+))$
+method-rgx=(test_)|([a-z_][a-z0-9_]{0,30})$
+no-docstring-rgx=__.*__
+dummy-variables-rgx=_$|dummy
+
+[FORMAT]
+max-line-length=120
+
+[LOGGING]
+
+[CLASSES]
+
+[IMPORTS]
+
+[DESIGN]
+max-args=10
+
+[EXCEPTIONS]

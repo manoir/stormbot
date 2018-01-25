@@ -5,8 +5,7 @@ import logging
 import argparse
 import getpass
 import platform
-import importlib
-import inspect
+import pkg_resources
 
 from stormbot.bot import StormBot, Plugin
 
@@ -14,8 +13,13 @@ def main():
     """Main function"""
     jid = "{}@{}/stormbot".format(getpass.getuser(), platform.node())
 
+    default_plugins = []
+    for entry_point in pkg_resources.iter_entry_points("stormbot.plugins"):
+        for attr in entry_point.attrs:
+            default_plugins.append("{}.{}".format(entry_point.module_name, attr))
+
     parser = argparse.ArgumentParser(description="stormbot executing your orders")
-    parser.add_argument('--plugins', default="stormbot.say,stormbot.music,stormbot.fortune",
+    parser.add_argument('--plugins', default=",".join(default_plugins),
                         type=str, help="Comma separated list of plugin to load (default: %(default)s)")
     parser.add_argument('-v', '--verbose', action='store_true', help="Enable verbose logging")
     parser.add_argument('--jid', type=str, default=jid,
@@ -33,34 +37,26 @@ def main():
 
     # resolve plugins
     plugins = []
-    for module_name in args.plugins.split(','):
-        try:
-            module = importlib.import_module(module_name)
-            count = 0
-            for _, cls in inspect.getmembers(module, inspect.isclass):
-                if issubclass(cls, Plugin) and cls != Plugin:
-                    logging.info("loading plugin %s.%s", module.__name__, cls.__qualname__)
-                    plugins.append(cls)
-                    count = count + 1
-            if count < 1:
-                logging.warning("no valid stormbot plugin found in %s module", module_name)
-        except ImportError as e:
-            logging.error(e)
+    if len(args.plugins) > 0:
+        for plugin in args.plugins.split(','):
+            module, name = plugin.rsplit('.', maxsplit=1)
+            plugins.append(pkg_resources.load_entry_point(module, "stormbot.plugins", name))
 
     for plugin in plugins:
         plugin.argparser(parser)
 
     args = parser.parse_args()
 
-    # Init all plugins
-    plugins = [plugin(args) for plugin in plugins]
-
     # Start bot
     password = args.password or getpass.getpass()
-    bot = StormBot(args.jid, password, args.room, plugins)
+    bot = StormBot(args, password, plugins)
     bot.connect()
     bot.process(block=True)
 
+def list_plugins():
+    """Print list of available stormbot plugin to stdout"""
+    for entry_point in pkg_resources.iter_entry_points('stormbot.plugins'):
+        print("{}.{}".format(entry_point.module_name, entry_point.name))
 
 if __name__ == '__main__':
     main()

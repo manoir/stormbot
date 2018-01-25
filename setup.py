@@ -1,18 +1,25 @@
 #!/usr/bin/env python3
 
 from setuptools import setup, find_packages
+from codecs import open
+from os import path
+
+here = path.abspath(path.dirname(__file__))
+
+with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
+    long_description = f.read()
 
 setup(name='stormbot',
-      version='1.2',
+      version='1.4.0',
       description='XMPP bot',
+      long_description=long_description,
       author='Paul Fariello',
       author_email='paul@fariello.eu',
-      url='https://git.paulfariello.fr/Stormbot',
+      url='https://github.com/manoir/stormbot',
       packages=find_packages(),
-      package_data={'stormbot': ['data/*.dic']},
       scripts=['scripts/stormbot'],
-      install_requires=['sleekxmpp', 'dnspython', 'gtts'],
+      install_requires=['sleekxmpp', 'dnspython'],
       classifiers=['Environment :: Console',
-                   'Intended Audience :: System Administrators',
                    'Operating System :: POSIX',
+                   'Topic :: Communications :: Chat',
                    'Programming Language :: Python'])
