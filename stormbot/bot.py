@@ -143,7 +143,9 @@ class StormBot(ClientXMPP):
         except CommandParserAbort:
             pass
 
-    def write(self, string):
+    def write(self, string, *args, **kwargs):
+        if len(args) > 0 or len(kwargs) > 0:
+            string = string.format(*args, **kwargs)
         self.send_message(mto=self.room, mbody=string, mtype='groupchat')
 
     def subscribe(self, nick, plugin):
