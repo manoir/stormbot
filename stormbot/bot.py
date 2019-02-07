@@ -120,10 +120,12 @@ class StormBot(ClientXMPP):
                 except CommandParserError as e:
                     self.write(e.message)
                     self.write(e.usage)
+                except Exception as e:
+                    self.write("Are you trying to drive me insane?")
             elif msg['body'].startswith('all:'):
                 try:
                     self.command(msg)
-                except CommandParserError as e:
+                except Exception:
                     pass
             else:
                 match = re.search("^([^ :]+):", msg['body'])
@@ -132,16 +134,19 @@ class StormBot(ClientXMPP):
 
                 nick = match.group(1)
                 for plugin in self.subscriptions.get(nick, []):
-                    plugin.message(nick, msg)
+                    try:
+                        plugin.message(nick, msg)
+                    except Exception as e:
+                        self.write(e.message)
 
     def command(self, msg):
         """Handle a received command"""
+        args = shlex.split(msg['body'])[1:]
         try:
-            args = shlex.split(msg['body'])[1:]
             args = self.parser.parse_args(args)
             args.command(msg, self.parser, args)
-        except:
-            self.write("Are you trying to drive me insane?")
+        except CommandParserAbort:
+            pass
 
     def write(self, string, *args, **kwargs):
         if len(args) > 0 or len(kwargs) > 0:
