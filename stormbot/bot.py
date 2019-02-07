@@ -136,12 +136,12 @@ class StormBot(ClientXMPP):
 
     def command(self, msg):
         """Handle a received command"""
-        args = shlex.split(msg['body'])[1:]
         try:
+            args = shlex.split(msg['body'])[1:]
             args = self.parser.parse_args(args)
             args.command(msg, self.parser, args)
-        except CommandParserAbort:
-            pass
+        except:
+            self.write("Are you trying to drive me insane?")
 
     def write(self, string, *args, **kwargs):
         if len(args) > 0 or len(kwargs) > 0:
