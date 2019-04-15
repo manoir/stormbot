@@ -7,6 +7,7 @@ import re
 
 from abc import ABCMeta, abstractmethod
 from sleekxmpp import ClientXMPP
+import ssl
 
 class Plugin(metaclass=ABCMeta):
     """Abstract plugin to be subclassed for each command of StormBot"""
@@ -79,6 +80,7 @@ class StormBot(ClientXMPP):
         self.plugins_cls = [Helper] + (plugins or [])
         self.plugins = []
         self.subscriptions = {}
+        self.ssl_version = ssl.PROTOCOL_TLS
 
         self.add_event_handler("session_start", self.session_start)
 
