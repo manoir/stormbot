@@ -123,7 +123,9 @@ class StormBot(ClientXMPP):
                     self.write(e.message)
                     self.write(e.usage)
                 except Exception as e:
+                    import traceback
                     self.write("Are you trying to drive me insane?")
+                    print(traceback.format_exc())
             elif msg['body'].startswith('all:'):
                 try:
                     self.command(msg)
