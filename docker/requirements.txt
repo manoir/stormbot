@@ -1,0 +1,6 @@
+stormbot
+stormbot-fortune
+stormbot-music
+stormbot-quizz
+stormbot-say
+stormbot-quote
