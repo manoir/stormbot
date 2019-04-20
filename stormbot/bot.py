@@ -315,9 +315,13 @@ class StormBot(ClientXMPP):
 
             if distribution.project_name == plugin_et.get('name') \
                and distribution.version == plugin_et.get('version'):
-                   msg = {'mucnick': command.get('from'), 'body': command.text}
-                   self._command(msg)
-                   return
+                msg = {'mucnick': command.get('from'), 'body': command.text}
+                try:
+                    self._command(msg)
+                except Exception as e:
+                    iq.error().send()
+                iq.reply().send()
+                return
 
         logging.error("Received command for unsupported plugin")
 
