@@ -16,6 +16,7 @@ from slixmpp.jid import JID
 from slixmpp.plugins.base import BasePlugin
 from slixmpp.xmlstream.handler.callback import Callback
 from slixmpp.xmlstream.matcher.xpath import MatchXPath
+from distutils.version import StrictVersion
 import ssl
 
 class Plugin(metaclass=ABCMeta):
@@ -96,7 +97,7 @@ class StormbotPeering(BasePlugin):
         self.xmpp.plugin['xep_0030'].add_feature(self.namespace)
         for plugin in self._plugins:
             self.xmpp.plugin['xep_0030'].add_item(node=self.namespace,
-                                                  name=plugin)
+                                                  jid=plugin)
 
     def add_plugin(self, name, version):
         self._plugins.append(f"{name}#{version}")
@@ -119,10 +120,9 @@ class StormbotPeering(BasePlugin):
 
 
 class Peer:
-    def __init__(self, room, nick, master=False):
+    def __init__(self, room, nick):
         self._room = room
         self._nick = nick
-        self.master = master
         self._plugins = {}
 
     @property
@@ -131,6 +131,10 @@ class Peer:
 
     def add_plugin(self, name, version):
         self._plugins[name] = {'name': name, 'version': version}
+
+    def supports(self, name, version):
+        return name in self._plugins \
+                and StrictVersion(self._plugins[name]['version']) >= StrictVersion(version)
 
 
 class CommandParser(argparse.ArgumentParser):
@@ -239,9 +243,7 @@ class StormBot(ClientXMPP):
         args = shlex.split(msg['body'])[1:]
         try:
             args = self.cmd_parser.parse_args(args)
-            if not peer:
-                self._peer_send_command(args.command.__self__.__class__, msg)
-            args.command(msg, self.cmd_parser, args)
+            args.command(msg, self.cmd_parser, args, peer)
         except CommandParserAbort:
             pass
 
@@ -303,32 +305,25 @@ class StormBot(ClientXMPP):
         for plugin in plugins:
             peer.add_plugin(plugin.get('name'), plugin.get('version'))
 
-    def _peer_send_command(self, cls, msg):
+    def peer_send_command(self, plugin, peer, msg):
+        distribution = pkg_resources.get_distribution(plugin.__class__.__module__)
+
+        iq = self.make_iq_set(ito=peer.jid)
+        query = ET.Element("{%s}query" % PeerCommand.namespace)
+        plugin_et = ET.Element("plugin")
+        plugin_et.set('name', distribution.project_name)
+        plugin_et.set('version', distribution.version)
+        query.append(plugin_et)
+
+        command_et = ET.Element("command")
+        command_et.set('from', msg['mucnick'])
+        command_et.text = msg['body']
+        query.append(command_et)
+        iq.xml.append(query)
         try:
-            distribution = pkg_resources.get_distribution(cls.__module__)
-        except pkg_resources.DistributionNotFound:
-            return
-
-        for peer in self._peers.values():
-            if peer.master:
-                continue
-
-            iq = self.make_iq_set(ito=peer.jid)
-            query = ET.Element("{%s}query" % PeerCommand.namespace)
-            plugin_et = ET.Element("plugin")
-            plugin_et.set('name', distribution.project_name)
-            plugin_et.set('version', distribution.version)
-            query.append(plugin_et)
-
-            command_et = ET.Element("command")
-            command_et.set('from', msg['mucnick'])
-            command_et.text = msg['body']
-            query.append(command_et)
-            iq.xml.append(query)
-            try:
-                iq.send()
-            except IqError as e:
-                logging.info("Peer couldn't execute command: %s", e)
+            iq.send()
+        except IqError as e:
+            logging.info("Peer couldn't execute command: %s", e)
 
 
     def _peer_recv_command(self, iq):
@@ -368,16 +363,20 @@ class StormBot(ClientXMPP):
         try:
             items = await self.plugin['xep_0030'].get_items(jid=f"{self.room}/{nick}",
                                                               node=StormbotPeering.namespace)
-            self._peers[nick] = Peer(self.room, nick, master=self.nick.startswith(nick))
+            self._peers[nick] = Peer(self.room, nick)
             for plugin in items['disco_items']['items']:
-                name, version = plugin[2].split('#')
+                name, version = plugin[0].split('#')
                 self._peers[nick].add_plugin(name, version)
 
         except IqError as e:
             logging.error(f"Couldn't connect to peer {room}/{nick}: {e.iq['error']['condition']}")
 
-    def _peer_discover(self):
-        pass
+    def get_peers(self, plugin=None):
+        if plugin is None:
+            return self._peers.values()
+        else:
+            distribution = pkg_resources.get_distribution(plugin.__class__.__module__)
+            return filter(lambda p: p.supports(distribution.project_name, distribution.version), self._peers.values())
 
 class Fakebot:
     def write(sef, *args, **kwargs):
