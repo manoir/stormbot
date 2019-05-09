@@ -1,6 +1,7 @@
 """
 Main bot of stormbot
 """
+import asyncio
 import argparse
 import shlex
 import re
@@ -8,13 +9,13 @@ import logging
 import pkg_resources
 
 from abc import ABCMeta, abstractmethod
-from sleekxmpp import ClientXMPP, Iq
-from sleekxmpp.exceptions import IqError
-from sleekxmpp.xmlstream import ElementBase, ET, register_stanza_plugin
-from sleekxmpp.jid import JID
-from sleekxmpp.plugins.base import base_plugin
-from sleekxmpp.xmlstream.handler.callback import Callback
-from sleekxmpp.xmlstream.matcher.xpath import MatchXPath
+from slixmpp import ClientXMPP, Iq
+from slixmpp.exceptions import IqError
+from slixmpp.xmlstream import ElementBase, ET, register_stanza_plugin
+from slixmpp.jid import JID
+from slixmpp.plugins.base import BasePlugin
+from slixmpp.xmlstream.handler.callback import Callback
+from slixmpp.xmlstream.matcher.xpath import MatchXPath
 import ssl
 
 class Plugin(metaclass=ABCMeta):
@@ -70,19 +71,35 @@ class PeerCommand(ElementBase):
     plugin_attrib = "command"
 
 
-class StormbotPeering(base_plugin):
-    def plugin_init(self):
-        self.description = "Stormbot peer communication"
+class StormbotPeering(BasePlugin):
+    name = "stormbot_peering"
+    namespace = "https://github.com/manoir/stormbot:1"
+    description = "Stormbot peer communication"
+    dependencies = {'xep_0030'}
 
-        self.xmpp.registerHandler(Callback('Peer plugins',
+    def plugin_init(self):
+        self._plugins = []
+        self.xmpp.register_handler(Callback('Peer plugins',
                                            MatchXPath('{%s}iq/{%s}query' % (self.xmpp.default_ns, PeerPlugins.namespace)),
                                            self._handle_plugins))
         register_stanza_plugin(Iq, PeerPlugins)
 
-        self.xmpp.registerHandler(Callback('Peer command',
+        self.xmpp.register_handler(Callback('Peer command',
                                            MatchXPath('{%s}iq/{%s}query' % (self.xmpp.default_ns, PeerCommand.namespace)),
                                            self._handle_command))
         register_stanza_plugin(Iq, PeerCommand)
+
+    def plugin_end(self):
+        self.xmpp.plugin['xep_0030'].del_feature(feature=self.namespace)
+
+    def session_bind(self, jid):
+        self.xmpp.plugin['xep_0030'].add_feature(self.namespace)
+        for plugin in self._plugins:
+            self.xmpp.plugin['xep_0030'].add_item(node=self.namespace,
+                                                  name=plugin)
+
+    def add_plugin(self, name, version):
+        self._plugins.append(f"{name}#{version}")
 
     def _handle_plugins(self, iq):
         logging.debug("Received peer plugins iq")
@@ -112,8 +129,8 @@ class Peer:
     def jid(self):
         return f"{self._room}/{self._nick}"
 
-    def add_plugin(self, name, version, entry_point):
-        self._plugins[name] = {'name': name, 'version': version, 'entry_point': entry_point}
+    def add_plugin(self, name, version):
+        self._plugins[name] = {'name': name, 'version': version}
 
 
 class CommandParser(argparse.ArgumentParser):
@@ -151,6 +168,7 @@ class StormBot(ClientXMPP):
 
         self.add_event_handler("session_start", self.session_start)
 
+        self.register_plugin('xep_0030') # Discovery
         self.register_plugin('xep_0045') # MUC
         self.register_plugin('StormbotPeering', module=self.__class__.__module__)
         self.add_event_handler("peer_plugins_get", self._plugins_get)
@@ -160,31 +178,36 @@ class StormBot(ClientXMPP):
         self.add_event_handler("groupchat_message", self._muc_message)
         self.add_event_handler("muc::{}::got_online".format(self.room), self.got_online)
 
+        # Init all plugins
+        self.plugins = [plugin(self, self.args) for plugin in self.plugins_cls]
+
+        # Init parser
+        self.cmd_parser = CommandParser(description="stormbot executing your orders",
+                                    prog=self.nick + ':', add_help=False,
+                                    bot=self)
+        subparsers = self.cmd_parser.add_subparsers()
+        for plugin in self.plugins:
+            plugin.cmdparser(subparsers)
+
+            try:
+                distribution = pkg_resources.get_distribution(plugin.__class__.__module__)
+            except pkg_resources.DistributionNotFound:
+                continue
+
+            self.plugin['StormbotPeering'].add_plugin(distribution.project_name, distribution.version)
+
 
     def session_start(self, _):
         """Start an xmpp session"""
         self.send_presence()
-        self.plugin['xep_0045'].joinMUC(self.room, self.nick, wait=True)
+        self.plugin['xep_0045'].join_muc(self.room, self.nick, wait=True)
 
-    def got_online(self, presence):
-        if presence['muc']['nick'] == self.nick:
-            # Init all plugins
-            self.plugins = [plugin(self, self.args) for plugin in self.plugins_cls]
-
-            # Init parser
-            self.parser = CommandParser(description="stormbot executing your orders",
-                                        prog=self.nick + ':', add_help=False,
-                                        bot=self)
-            subparsers = self.parser.add_subparsers()
-            for plugin in self.plugins:
-                plugin.cmdparser(subparsers)
-
-        else:
+    async def got_online(self, presence):
+        if presence['muc']['nick'] != self.nick:
             for plugin in self.plugins:
                 plugin.got_online(presence)
 
-            if self._is_peer(presence['muc']['nick']):
-                self._peer_connect(presence['muc']['room'], presence['muc']['nick'])
+            await self._handle_peer(presence)
 
     def _muc_message(self, msg):
         """Handle received muc message"""
@@ -211,13 +234,14 @@ class StormBot(ClientXMPP):
                     except Exception as e:
                         self.write(e.message)
 
-    def _command(self, msg):
+    def _command(self, msg, peer=False):
         """Handle a received command"""
         args = shlex.split(msg['body'])[1:]
         try:
-            args = self.parser.parse_args(args)
-            self._peer_send_command(args.command.__self__.__class__, msg)
-            args.command(msg, self.parser, args)
+            args = self.cmd_parser.parse_args(args)
+            if not peer:
+                self._peer_send_command(args.command.__self__.__class__, msg)
+            args.command(msg, self.cmd_parser, args)
         except CommandParserAbort:
             pass
 
@@ -231,8 +255,18 @@ class StormBot(ClientXMPP):
             self.subscriptions[nick] = []
         self.subscriptions[nick].append(plugin)
 
-    def _is_peer(self, nick):
-        return nick.startswith(self.nick) or self.nick.startswith(nick)
+    async def _handle_peer(self, presence):
+        nick = presence['muc']['nick']
+        is_peer = await self._is_peer(nick)
+        if is_peer:
+            await self._peer_connect(presence['muc']['room'], presence['muc']['nick'])
+
+    async def _is_peer(self, nick):
+        if len(nick) == 0:
+            return False
+
+        info = await self.plugin['xep_0030'].get_info(jid=f"{self.room}/{nick}")
+        return StormbotPeering.namespace in info['disco_info']['features']
 
     def _peer_send(self, peer, msg):
         self.send_message(mto=peer.jid, mbody=msg, mtype="chat")
@@ -267,7 +301,7 @@ class StormBot(ClientXMPP):
         peer = self._peers[jid.resource]
         plugins = iq['plugins'].xml.find("{%s}plugins" % PeerPlugins.namespace)
         for plugin in plugins:
-            peer.add_plugin(plugin.get('name'), plugin.get('version'), plugin.get('entry_point'))
+            peer.add_plugin(plugin.get('name'), plugin.get('version'))
 
     def _peer_send_command(self, cls, msg):
         try:
@@ -317,7 +351,7 @@ class StormBot(ClientXMPP):
                and distribution.version == plugin_et.get('version'):
                 msg = {'mucnick': command.get('from'), 'body': command.text}
                 try:
-                    self._command(msg)
+                    self._command(msg, True)
                 except Exception as e:
                     iq.error().send()
                 iq.reply().send()
@@ -325,17 +359,22 @@ class StormBot(ClientXMPP):
 
         logging.error("Received command for unsupported plugin")
 
-    def _peer_connect(self, room, nick):
+    async def _peer_connect(self, room, nick):
         logging.info(f"Connecting to peer {self.room}/{nick}")
 
         if nick in self._peers:
             del self._peers[nick]
-        self._peers[nick] = Peer(self.room, nick, master=self.nick.startswith(nick))
-        if self._peers[nick].master:
-            self._master = self._peers[nick]
-        else:
-            iq = self.make_iq_get(queryxmlns=PeerPlugins.namespace, ito=self._peers[nick].jid)
-            iq.send()
+
+        try:
+            items = await self.plugin['xep_0030'].get_items(jid=f"{self.room}/{nick}",
+                                                              node=StormbotPeering.namespace)
+            self._peers[nick] = Peer(self.room, nick, master=self.nick.startswith(nick))
+            for plugin in items['disco_items']['items']:
+                name, version = plugin[2].split('#')
+                self._peers[nick].add_plugin(name, version)
+
+        except IqError as e:
+            logging.error(f"Couldn't connect to peer {room}/{nick}: {e.iq['error']['condition']}")
 
     def _peer_discover(self):
         pass
@@ -351,8 +390,8 @@ def main(cls):
     args = argparser.parse_args()
     plugin = cls(Fakebot(), args)
 
-    parser = CommandParser()
-    subparser = parser.add_subparsers()
+    cmd_parser = CommandParser()
+    subparser = cmd_parser.add_subparsers()
     plugin.cmdparser(subparser)
-    args = parser.parse_args(args._)
-    plugin.run("todo", parser, args)
+    args = cmd_parser.parse_args(args._)
+    plugin.run("todo", cmd_parser, args)
