@@ -51,7 +51,7 @@ def main():
     password = args.password or getpass.getpass()
     bot = StormBot(args, password, plugins)
     bot.connect()
-    bot.process(block=True)
+    bot.process()
 
 def list_plugins():
     """Print list of available stormbot plugin to stdout"""
