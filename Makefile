@@ -1,4 +1,4 @@
-VERSION=$(shell grep -Po "(?<=version=([\"']))(([0-9]\.){2}[0-9])" setup.py)
+VERSION=$(shell grep -Po "(?<=version=([\"']))(([0-9]\.){2}(dev)?[0-9])" setup.py)
 PKG_NAME=$(shell grep -Po "(?<=name=([\"']))(.*)(?=\1)" setup.py)
 SDIST=dist/${PKG_NAME}-${VERSION}.tar.gz
 ASC=${SDIST}.asc
