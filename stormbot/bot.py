@@ -16,7 +16,7 @@ from slixmpp.jid import JID
 from slixmpp.plugins.base import BasePlugin
 from slixmpp.xmlstream.handler.callback import Callback
 from slixmpp.xmlstream.matcher.xpath import MatchXPath
-from distutils.version import StrictVersion
+from distutils.version import LooseVersion
 import ssl
 
 class Plugin(metaclass=ABCMeta):
@@ -134,7 +134,7 @@ class Peer:
 
     def supports(self, name, version):
         return name in self._plugins \
-                and StrictVersion(self._plugins[name]['version']) >= StrictVersion(version)
+                and LooseVersion(self._plugins[name]['version']) >= LooseVersion(version)
 
 
 class CommandParser(argparse.ArgumentParser):
