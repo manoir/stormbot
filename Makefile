@@ -6,11 +6,9 @@ REPO?=pypi
 
 all: ${SDIST} ${ASC}
 
-test:
-	./setup.py check --restructuredtext
-
-${SDIST}: test
+${SDIST}:
 	./setup.py build sdist
+	twine check ${SDIST}
 
 ${ASC}: ${SDIST}
 	gpg --detach-sign --default-key 56B1766D69E513DB9E405BBB672CDD2031AAF49B -a $<
@@ -22,4 +20,4 @@ clean:
 	rm -rf dist/*.tar.gz
 	rm -rf dist/*.asc
 
-.PHONY: ${SDIST} test
+.PHONY: ${SDIST}
