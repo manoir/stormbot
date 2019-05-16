@@ -400,6 +400,22 @@ class Fakebot:
     def write(sef, *args, **kwargs):
         print(*args, **kwargs)
 
+def mock(argv):
+    from functools import wraps
+    from unittest.mock import patch
+    import io
+
+    argv = [argv[0]] + argv
+    def decorator(f):
+        wrapped = patch('sys.stdout', new_callable=io.StringIO)(f)
+        wrapped = patch('sys.stderr', lambda: io.StringIO())(wrapped)
+        wrapped = patch('sys.exit', lambda _: None)(wrapped)
+        wrapped = patch('sys.argv', argv)(wrapped)
+
+        return wrapped
+
+    return decorator
+
 def main(cls):
     argparser = argparse.ArgumentParser()
     cls.argparser(argparser)
