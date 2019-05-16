@@ -56,6 +56,9 @@ class Storage(DictProxy):
     def __init__(self, path):
         super().__init__(self)
         self.path = path
+        self._load()
+
+    def _load(self):
         if os.path.isfile(self.path):
             with open(self.path, 'r') as cachefile:
                 self._cache = json.load(cachefile)
@@ -70,3 +73,15 @@ class Storage(DictProxy):
     def dump(self):
         with open(self.path, 'w') as cachefile:
             json.dump(self._cache, cachefile, cls=ProxyEncoder)
+
+def mock(values):
+    from functools import wraps
+    from unittest.mock import patch, MagicMock
+
+    def decorator(f):
+        wrapper = patch('stormbot.storage.Storage._load', lambda _: None)(f)
+        wrapper = patch('stormbot.storage.Storage.__getitem__', lambda _, key: values.__getitem__(key))(wrapper)
+        wrapper = patch('stormbot.storage.Storage.__contains__', lambda _, key: values.__contains__(key))(wrapper)
+
+        return wrapper
+    return decorator
