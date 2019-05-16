@@ -2,9 +2,12 @@ language: python
 python:
   - "3.6"
 install:
+  - pip install nose twine
+script:
+  - ./setup.py build sdist
+  - twine check dist/*
   - pip install .
-  - pip install nose
-script: nosetests
+  - nosetests
 deploy:
   provider: pypi
   user: "pfariello"
