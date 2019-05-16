@@ -411,4 +411,4 @@ def main(cls):
     subparser = cmd_parser.add_subparsers()
     plugin.cmdparser(subparser)
     args = cmd_parser.parse_args(args._)
-    plugin.run("todo", cmd_parser, args)
+    plugin.run("todo", cmd_parser, args, False)
