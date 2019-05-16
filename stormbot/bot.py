@@ -49,6 +49,24 @@ class Helper(Plugin):
     def help(self, msg, parser, *_):
         self._bot.write(parser.format_help())
 
+class Version(Plugin):
+    """Print version"""
+    def cmdparser(self, parser):
+        subparser = parser.add_parser('version', bot=self._bot)
+        subparser.set_defaults(command=self.version)
+
+    def version(self, msg, parser, *_):
+        distribution = pkg_resources.get_distribution('stormbot')
+
+        self._bot.write(f"{distribution.project_name} {distribution.version}")
+
+        for plugin in self._bot.plugins:
+            try:
+                distribution = pkg_resources.get_distribution(plugin.__class__.__module__)
+                self._bot.write(f"{distribution.project_name} {distribution.version}")
+            except pkg_resources.DistributionNotFound:
+                continue
+
 
 class CommandParserError(Exception):
     def __init__(self, message, usage):
@@ -164,7 +182,7 @@ class StormBot(ClientXMPP):
         self.args = args
         self.room, _, self.nick = args.room.partition('/')
         self.nick = self.nick or "stormbot"
-        self.plugins_cls = [Helper] + (plugins or [])
+        self.plugins_cls = [Helper, Version] + (plugins or [])
         self.plugins = []
         self.subscriptions = {}
         self.ssl_version = ssl.PROTOCOL_TLS
