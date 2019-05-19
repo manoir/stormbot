@@ -12,7 +12,7 @@ class ListProxy(collections.abc.MutableSequence):
         self._cache = cache or []
 
     def __getitem__(self, index):
-        return self._cache.__getitem__(index)
+        return self._storage.proxy(self._cache.__getitem__(index))
 
     def __setitem__(self, index, value):
         self._cache.__setitem__(index, self._storage.proxy(value))
@@ -36,7 +36,7 @@ class DictProxy(collections.abc.MutableMapping):
         self._cache = cache or {}
 
     def __getitem__(self, key):
-        return self._cache.__getitem__(key)
+        return self._storage.proxy(self._cache.__getitem__(key))
 
     def __setitem__(self, key, value):
         self._cache.__setitem__(key, self._storage.proxy(value))
