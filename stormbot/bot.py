@@ -20,6 +20,8 @@ from distutils.version import LooseVersion
 import ssl
 
 class Plugin(metaclass=ABCMeta):
+    dependencies = {}
+
     """Abstract plugin to be subclassed for each command of StormBot"""
     def __init__(self, bot, args=None):
         self._bot = bot
@@ -133,19 +135,21 @@ class StormbotPeering(BasePlugin):
         logging.debug("Received peer command iq")
         if iq['type'] == 'set':
             self.xmpp.event('peer_command', iq)
+        if iq['type'] == 'result':
+            pass
         else:
             logging.error(f"Got unknown iq type for command {iq['type']}")
 
 
 class Peer:
     def __init__(self, room, nick):
-        self._room = room
-        self._nick = nick
+        self.room = room
+        self.nick = nick
         self._plugins = {}
 
     @property
     def jid(self):
-        return f"{self._room}/{self._nick}"
+        return f"{self.room}/{self.nick}"
 
     def add_plugin(self, name, version):
         self._plugins[name] = {'name': name, 'version': version}
@@ -209,6 +213,8 @@ class StormBot(ClientXMPP):
                                     bot=self)
         subparsers = self.cmd_parser.add_subparsers()
         for plugin in self.plugins:
+            for dep in plugin.dependencies:
+                self.register_plugin(dep)
             plugin.cmdparser(subparsers)
 
             try:
@@ -231,12 +237,12 @@ class StormBot(ClientXMPP):
 
             await self._handle_peer(presence)
 
-    def _muc_message(self, msg):
+    async def _muc_message(self, msg):
         """Handle received muc message"""
         if msg['mucnick'] != self.nick:
             if msg['body'].startswith(self.nick + ':'):
                 try:
-                    self._command(msg)
+                    await self._command(msg)
                 except CommandParserError as e:
                     self.write(e.message)
                     self.write(e.usage)
@@ -256,12 +262,12 @@ class StormBot(ClientXMPP):
                     except Exception as e:
                         self.write(e.message)
 
-    def _command(self, msg, peer=False):
+    async def _command(self, msg, peer=None):
         """Handle a received command"""
         args = shlex.split(msg['body'])[1:]
         try:
             args = self.cmd_parser.parse_args(args)
-            args.command(msg, self.cmd_parser, args, peer)
+            return await args.command(msg, self.cmd_parser, args, peer)
         except CommandParserAbort:
             pass
 
@@ -309,7 +315,7 @@ class StormBot(ClientXMPP):
             plugins.append(plugin)
 
         query.xml.append(plugins)
-        iq.reply().setPayload(query.xml)
+        iq.reply().set_payload(query.xml)
         iq.send()
 
     def _plugins_result(self, iq):
@@ -323,7 +329,7 @@ class StormBot(ClientXMPP):
         for plugin in plugins:
             peer.add_plugin(plugin.get('name'), plugin.get('version'))
 
-    def peer_send_command(self, plugin, peer, msg):
+    def peer_forward_msg(self, plugin, peer, msg, timeout=None):
         distribution = pkg_resources.get_distribution(plugin.__class__.__module__)
 
         iq = self.make_iq_set(ito=peer.jid)
@@ -338,19 +344,20 @@ class StormBot(ClientXMPP):
         command_et.text = msg['body']
         query.append(command_et)
         iq.xml.append(query)
-        try:
-            iq.send()
-        except IqError as e:
-            logging.info("Peer couldn't execute command: %s", e)
+        return asyncio.ensure_future(iq.send(timeout=timeout))
 
+    def peer_send_command(self, plugin, peer, command, sender=None, timeout=None):
+        msg = {'body': f"{peer.nick}: {command}", 'mucnick': sender or self.nick}
+        return self.peer_forward_msg(plugin, peer, msg, timeout)
 
-    def _peer_recv_command(self, iq):
+    async def _peer_recv_command(self, iq):
         jid = JID(iq['from'])
         if jid.bare != self.room or jid.resource not in self._peers:
             logging.error("Received command from unknown peer")
             return
 
         peer = self._peers[jid.resource]
+        # TODO use plygin interfaces and sub_interfaces
         plugin_et = iq['command'].xml.find("{%s}plugin" % PeerCommand.namespace)
         command = iq['command'].xml.find("{%s}command" % PeerCommand.namespace)
 
@@ -364,10 +371,25 @@ class StormBot(ClientXMPP):
                and distribution.version == plugin_et.get('version'):
                 msg = {'mucnick': command.get('from'), 'body': command.text}
                 try:
-                    self._command(msg, True)
+                    result = await self._command(msg, peer)
+                    if result is not None:
+                        logging.info(f"Command result: {result}")
+                        command = iq['command']
+                        reply = iq.reply()
+                        et_result = ET.Element('result')
+                        et_result.text = result
+                        command.xml.append(et_result)
+                        reply.set_payload(command.xml)
+                        reply.send()
+                    else:
+                        reply = iq.reply()
+                        reply.send()
                 except Exception as e:
-                    iq.error().send()
-                iq.reply().send()
+                    reply = iq.reply()
+                    reply.error()
+                    reply['error']['condition'] = "internal-server-error"
+                    reply['error']['text'] = str(e)
+                    reply.send()
                 return
 
         logging.error("Received command for unsupported plugin")
