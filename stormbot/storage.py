@@ -59,9 +59,9 @@ class Storage(DictProxy):
         self._load()
 
     def _load(self):
+        self._file = open(self.path, 'r+')
         if os.path.isfile(self.path):
-            with open(self.path, 'r') as cachefile:
-                self._cache = json.load(cachefile)
+            self._cache = json.load(self._file)
 
     def proxy(self, value):
         if isinstance(value, list):
@@ -71,8 +71,8 @@ class Storage(DictProxy):
         return value
 
     def dump(self):
-        with open(self.path, 'w') as cachefile:
-            json.dump(self._cache, cachefile, cls=ProxyEncoder)
+        self._file.seek(0)
+        json.dump(self._cache, self._file, cls=ProxyEncoder)
 
 def mock(values):
     from functools import wraps
