@@ -76,5 +76,6 @@ class Storage(DictProxy):
 
     def dump(self):
         self._file.seek(0)
+        self._file.truncate()
         json.dump(self._cache, self._file, cls=ProxyEncoder)
         self._file.flush()
