@@ -10,7 +10,7 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(name='stormbot',
-      version='1.7.dev5',
+      version='1.7.dev6',
       description='XMPP bot',
       long_description=long_description,
       author='Paul Fariello',
