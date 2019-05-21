@@ -49,7 +49,7 @@ class Helper(Plugin):
         subparser = parser.add_parser('help', bot=self._bot)
         subparser.set_defaults(command=self.help)
 
-    def help(self, msg, parser, *_):
+    async def help(self, msg, parser, *_):
         self._bot.write(parser.format_help())
 
 class Version(Plugin):
@@ -58,7 +58,7 @@ class Version(Plugin):
         subparser = parser.add_parser('version', bot=self._bot)
         subparser.set_defaults(command=self.version)
 
-    def version(self, msg, parser, *_):
+    async def version(self, msg, parser, *_):
         distribution = pkg_resources.get_distribution('stormbot')
 
         self._bot.write(f"{distribution.project_name} {distribution.version}")
