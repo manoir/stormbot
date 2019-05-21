@@ -436,4 +436,4 @@ def main(cls):
     plugin.cmdparser(subparser)
     args = cmd_parser.parse_args(args._)
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(plugin.run("todo", cmd_parser, args, False))
+    loop.run_until_complete(args.command("main", cmd_parser, args, False))
