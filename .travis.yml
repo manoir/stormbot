@@ -4,12 +4,11 @@ python:
 services:
   - docker
 install:
-  - pip install nose twine
+  - pip install twine
 script:
+  - ./setup.py test
   - ./setup.py build sdist
   - twine check dist/*
-  - pip install .
-  - nosetests
 deploy:
   - provider: pypi
     user: "pfariello"

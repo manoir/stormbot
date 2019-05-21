@@ -78,15 +78,3 @@ class Storage(DictProxy):
         self._file.seek(0)
         json.dump(self._cache, self._file, cls=ProxyEncoder)
         self._file.flush()
-
-def mock(values):
-    from functools import wraps
-    from unittest.mock import patch, MagicMock
-
-    def decorator(f):
-        wrapper = patch('stormbot.storage.Storage._load', lambda _: None)(f)
-        wrapper = patch('stormbot.storage.Storage.__getitem__', lambda _, key: values.__getitem__(key))(wrapper)
-        wrapper = patch('stormbot.storage.Storage.__contains__', lambda _, key: values.__contains__(key))(wrapper)
-
-        return wrapper
-    return decorator
