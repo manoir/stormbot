@@ -7,6 +7,7 @@ import shlex
 import re
 import logging
 import pkg_resources
+import traceback
 
 from abc import ABCMeta, abstractmethod
 from slixmpp import ClientXMPP, Iq
@@ -385,6 +386,7 @@ class StormBot(ClientXMPP):
                         reply = iq.reply()
                         reply.send()
                 except Exception as e:
+                    traceback.print_exc()
                     reply = iq.reply()
                     reply.error()
                     reply['error']['condition'] = "internal-server-error"
