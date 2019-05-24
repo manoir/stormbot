@@ -193,6 +193,11 @@ class StormBot(ClientXMPP):
         self.ssl_version = ssl.PROTOCOL_TLS
         self._peers = {}
 
+        self._init_xmpp()
+        self._init_plugins()
+
+
+    def _init_xmpp(self):
         self.add_event_handler("session_start", self.session_start)
 
         self.register_plugin('xep_0030') # Discovery
@@ -205,6 +210,8 @@ class StormBot(ClientXMPP):
         self.add_event_handler("groupchat_message", self._muc_message)
         self.add_event_handler("muc::{}::got_online".format(self.room), self.got_online)
 
+
+    def _init_plugins(self):
         # Init all plugins
         self.plugins = [plugin(self, self.args) for plugin in self.plugins_cls]
 
