@@ -1,29 +1,46 @@
 import io
+import asyncio
 
+from .bot import StormBot
 from functools import wraps
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, Mock
+from collections.abc import MutableMapping
 
-def bot(argv):
-    argv = [argv[0]] + argv
-    def decorator(f):
-        stdout = io.StringIO()
-        wrapped = patch('stormbot.bot.Fakebot.write', lambda _, *args, **kwargs: print(*args, **kwargs, file=stdout))(f)
-        wrapped = patch('sys.exit', lambda _: None)(f)
-        wrapped = patch('sys.argv', argv)(wrapped)
+def bot(plugin):
+    bot = None
+    args = MagicMock()
+    args.jid = 'stormbot@example.org'
+    args.room = 'room@conference.example.org/stormbot'
+    bot = StormBot(args, '', [plugin])
+    bot.send_message = Mock()
 
-        def wrapping(*args, **kwargs):
-            args += (stdout,)
-            wrapped(*args, **kwargs)
+    def run_command(command):
+        msg = {}
+        msg['body'] = command
+        return asyncio.get_event_loop().run_until_complete(bot._command(msg))
 
-        return wrapping
+    bot.command = run_command
 
-    return decorator
+    return bot
 
-def storage(values):
-    def decorator(f):
-        wrapper = patch('stormbot.storage.Storage._load', lambda _: None)(f)
-        wrapper = patch('stormbot.storage.Storage.__getitem__', lambda _, key: values.__getitem__(key))(wrapper)
-        wrapper = patch('stormbot.storage.Storage.__contains__', lambda _, key: values.__contains__(key))(wrapper)
+class Storage(MutableMapping):
+    def __init__(self):
+        self._storage = {}
 
-        return wrapper
-    return decorator
+    def __setitem__(self, key, value):
+        return self._storage.__setitem__(key, value)
+
+    def __delitem__(self, key):
+        return self._storage.__delitem__(key)
+
+    def __getitem__(self, key):
+        return self._storage.__getitem__(key)
+
+    def __iter__(self):
+        return self._storage.__iter__(self)
+
+    def __len__(self):
+        return self.__storage.__len__(self)
+
+    def __call__(self, path):
+        return self
