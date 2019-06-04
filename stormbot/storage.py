@@ -1,6 +1,10 @@
 import os
-import pickle
+import json
 import collections.abc
+
+class ProxyEncoder(json.JSONEncoder):
+    def default(self, o):
+        return o._cache
 
 class ListProxy(collections.abc.MutableSequence):
     def __init__(self, storage, cache=None):
@@ -8,7 +12,7 @@ class ListProxy(collections.abc.MutableSequence):
         self._cache = cache or []
 
     def __getitem__(self, index):
-        return self._cache.__getitem__(index)
+        return self._storage.proxy(self._cache.__getitem__(index))
 
     def __setitem__(self, index, value):
         self._cache.__setitem__(index, self._storage.proxy(value))
@@ -32,7 +36,7 @@ class DictProxy(collections.abc.MutableMapping):
         self._cache = cache or {}
 
     def __getitem__(self, key):
-        return self._cache.__getitem__(key)
+        return self._storage.proxy(self._cache.__getitem__(key))
 
     def __setitem__(self, key, value):
         self._cache.__setitem__(key, self._storage.proxy(value))
@@ -52,9 +56,16 @@ class Storage(DictProxy):
     def __init__(self, path):
         super().__init__(self)
         self.path = path
+        self._load()
+
+    def _load(self):
         if os.path.isfile(self.path):
-            with open(self.path, 'rb') as cachefile:
-                self._cache = pickle.load(cachefile)
+            self._file = open(self.path, 'r+')
+            self._cache = json.load(self._file)
+        else:
+            self._file = open(self.path, 'a+')
+            self._cache = {}
+            self.dump()
 
     def proxy(self, value):
         if isinstance(value, list):
@@ -64,5 +75,7 @@ class Storage(DictProxy):
         return value
 
     def dump(self):
-        with open(self.path, 'wb') as cachefile:
-            pickle.dump(self._cache, cachefile)
+        self._file.seek(0)
+        self._file.truncate()
+        json.dump(self._cache, self._file, cls=ProxyEncoder)
+        self._file.flush()
