@@ -1,6 +1,6 @@
-stormbot
-stormbot-fortune
-stormbot-music
-stormbot-quizz
-stormbot-say
-stormbot-quote
+stormbot==1.7.dev8
+stormbot-fortune==1.7.dev7
+stormbot-music==1.7.dev6
+stormbot-quizz==1.7.dev7
+stormbot-say==1.7.dev8
+stormbot-quote==1.7.dev7

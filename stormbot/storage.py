@@ -56,9 +56,16 @@ class Storage(DictProxy):
     def __init__(self, path):
         super().__init__(self)
         self.path = path
+        self._load()
+
+    def _load(self):
         if os.path.isfile(self.path):
-            with open(self.path, 'r') as cachefile:
-                self._cache = json.load(cachefile)
+            self._file = open(self.path, 'r+')
+            self._cache = json.load(self._file)
+        else:
+            self._file = open(self.path, 'a+')
+            self._cache = {}
+            self.dump()
 
     def proxy(self, value):
         if isinstance(value, list):
@@ -68,5 +75,7 @@ class Storage(DictProxy):
         return value
 
     def dump(self):
-        with open(self.path, 'w') as cachefile:
-            json.dump(self._cache, cachefile, cls=ProxyEncoder)
+        self._file.seek(0)
+        self._file.truncate()
+        json.dump(self._cache, self._file, cls=ProxyEncoder)
+        self._file.flush()
