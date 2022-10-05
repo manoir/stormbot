@@ -236,7 +236,7 @@ class StormBot(ClientXMPP):
     def session_start(self, _):
         """Start an xmpp session"""
         self.send_presence()
-        self.plugin['xep_0045'].join_muc(self.room, self.nick, wait=True)
+        self.plugin['xep_0045'].join_muc(self.room, self.nick)
 
     async def got_online(self, presence):
         if presence['muc']['nick'] != self.nick:
