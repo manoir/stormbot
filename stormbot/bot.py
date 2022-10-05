@@ -299,8 +299,12 @@ class StormBot(ClientXMPP):
         if len(nick) == 0:
             return False
 
-        info = await self.plugin['xep_0030'].get_info(jid=f"{self.room}/{nick}")
-        return StormbotPeering.namespace in info['disco_info']['features']
+        try:
+            info = await self.plugin['xep_0030'].get_info(jid=f"{self.room}/{nick}")
+            return StormbotPeering.namespace in info['disco_info']['features']
+        except IqError as e:
+            logging.error(f"Couldn't check if {self.room}/{nick} is a peer: {e.iq['error']['condition']}")
+            return False
 
     def _peer_send(self, peer, msg):
         self.send_message(mto=peer.jid, mbody=msg, mtype="chat")
@@ -398,7 +402,7 @@ class StormBot(ClientXMPP):
                     reply.error()
                     reply['error']['condition'] = "internal-server-error"
                     reply['error']['text'] = str(e)
-                    reply.send()
+                    # reply.send()
                 return
 
         logging.error("Received command for unsupported plugin")
