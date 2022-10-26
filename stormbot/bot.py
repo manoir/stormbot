@@ -42,7 +42,12 @@ class Plugin(metaclass=ABCMeta):
         """Build command parser for stormbot (in chat)"""
         pass
 
+    def fallback(self, stanza, msg) -> bool:
+        """Try to handle a message that couldn't be parsed"""
+        return False
+
     def message(self, nick, msg):
+        """Handle a message directed to another nick"""
         pass
 
 class Helper(Plugin):
@@ -254,9 +259,17 @@ class StormBot(ClientXMPP):
             if msg['body'].startswith(self.nick + ':'):
                 try:
                     await self._command(msg)
-                except CommandParserError as e:
-                    self.write(e.message)
-                    self.write(e.usage)
+                except CommandParserError as parser_error:
+                    body = msg['body'][len(self.nick + ':'):]
+                    for plugin in self.plugins:
+                        try:
+                            if plugin.fallback(msg, body):
+                                break
+                        except Exception as e:
+                            logger.exception(e)
+                    else:
+                        self.write(parser_error.message)
+                        self.write(parser_error.usage)
                 except Exception as e:
                     self.write("Are you trying to drive me insane?")
                     logger.exception(e)
