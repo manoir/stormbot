@@ -6,8 +6,76 @@ import argparse
 import getpass
 import platform
 import pkg_resources
+import sys
 
+import stormbot
 from stormbot.bot import StormBot, Plugin
+
+logger = logging.getLogger(stormbot.__name__)
+
+
+class LogFormatter(logging.Formatter):
+    """Log formatter handling colored output"""
+
+    def __init__(self, colored=False):
+        super().__init__()
+        self._colored: bool = colored
+        self._colors: Dict[str, str] = {
+            "DEBUG": "",
+            "INFO": self._fg(2),
+            "WARNING": self._fg(3),
+            "ERROR": self._fg(1),
+        }
+
+    @staticmethod
+    def _csi(code: str) -> str:
+        return "\033[" + code
+
+    @staticmethod
+    def _sgr(code: str) -> str:
+        return LogFormatter._csi(code + "m")
+
+    @staticmethod
+    def _fg(color: int) -> str:
+        return LogFormatter._sgr(str(30 + color))
+
+    @staticmethod
+    def _reset() -> str:
+        return LogFormatter._sgr(str(0))
+
+    @staticmethod
+    def _bold() -> str:
+        return LogFormatter._sgr(str(1))
+
+    def format(self, record):
+        levelname = record.levelname
+        output = ""
+        if self._colored:
+            output += (
+                f"{self._bold()}{self._colors[levelname]}{record.levelname}{self._reset()}"
+                f":{self._bold()}{record.name}{self._reset()}"
+            )
+        else:
+            output += f"{record.levelname}:{record.name}"
+
+        output += f":{record.getMessage()}"
+
+        if record.exc_info:
+            # Cache the traceback text to avoid converting it multiple times
+            # (it's constant anyway)
+            if not record.exc_text:
+                record.exc_text = self.formatException(record.exc_info)
+        if record.exc_text:
+            if output[-1:] != "\n":
+                output = output + "\n"
+            output = output + record.exc_text
+        if record.stack_info:
+            if output[-1:] != "\n":
+                output = output + "\n"
+            output = output + self.formatStack(record.stack_info)
+
+        return output
+
 
 def main():
     """Main function"""
@@ -21,24 +89,64 @@ def main():
     parser = argparse.ArgumentParser(description="stormbot executing your orders")
     parser.add_argument('--plugins', default=",".join(default_plugins),
                         type=str, help="Comma separated list of plugin to load (default: %(default)s)")
-    parser.add_argument('-v', '--verbose', action='store_true', help="Enable verbose logging")
+    parser.add_argument('-v', '--verbose', action='count', default=0, help="Enable verbose logging")
+    subloggers = [stormbot.__name__ + '.' + plugin.strip("stormbot_").split('.')[0] for plugin in default_plugins]
+    parser.add_argument(
+        "--info",
+        help="Enable info logging for given component",
+        nargs="+",
+        type=str,
+        choices=subloggers,
+        default=[],
+    )
+    parser.add_argument(
+        "--debug",
+        help="Enable debug logging for given component",
+        nargs="+",
+        type=str,
+        choices=subloggers,
+        default=[],
+    )
     parser.add_argument('--jid', type=str, default=jid,
                         help="JID to connect with (default: %(default)s)")
     parser.add_argument('--password', type=str, default=None,
                         help="Password to connect with (default: promt)")
+    parser.add_argument('--version', action="store_true",
+                        help="Print stormbot version")
     parser.add_argument('room', type=str, help="Room to join (roomname@hostname[/nick])")
 
     args, _ = parser.parse_known_args()
 
-    if args.verbose:
-        logging.basicConfig(level=logging.DEBUG)
-    else:
-        logging.basicConfig(level=logging.WARNING)
+    levels = [logging.WARNING, logging.INFO, logging.DEBUG]
+    level = levels[min(len(levels) - 1, args.verbose)]
+
+    log_handler = logging.StreamHandler()
+    log_handler.setLevel(logging.DEBUG)
+
+    log_handler.setFormatter(LogFormatter(sys.stderr.isatty() or args.color))
+
+    logger.setLevel(level)
+    logger.addHandler(log_handler)
+
+    for sublogger in args.info:
+        logger.info("Enabling info logging for %s", sublogger)
+        sublogger = logging.getLogger(stormbot.__name__ + "." + sublogger)
+        sublogger.setLevel(logging.INFO)
+
+    for sublogger in args.debug:
+        logger.info("Enabling debug logging for %s", sublogger)
+        sublogger = logging.getLogger(stormbot.__name__ + "." + sublogger)
+        sublogger.setLevel(logging.DEBUG)
+
+    if args.version:
+        print(stormbot.__version__)
+        return
 
     # resolve plugins
     plugins = []
     if len(args.plugins) > 0:
         for plugin in args.plugins.split(','):
+            logger.info("Load %s", plugin)
             module, name = plugin.rsplit('.', maxsplit=1)
             plugins.append(pkg_resources.load_entry_point(module, "stormbot.plugins", name))
 
