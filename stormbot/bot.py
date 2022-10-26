@@ -20,6 +20,8 @@ from slixmpp.xmlstream.matcher.xpath import MatchXPath
 from distutils.version import LooseVersion
 import ssl
 
+logger = logging.getLogger(__name__)
+
 class Plugin(metaclass=ABCMeta):
     dependencies = {}
 
@@ -124,22 +126,22 @@ class StormbotPeering(BasePlugin):
         self._plugins.append(f"{name}#{version}")
 
     def _handle_plugins(self, iq):
-        logging.debug("Received peer plugins iq")
+        logger.debug("Received peer plugins iq")
         if iq['type'] == 'get':
             self.xmpp.event('peer_plugins_get', iq)
         elif iq['type'] == 'result':
             self.xmpp.event('peer_plugins_result', iq)
         else:
-            logging.error(f"Got unknown iq type for plugins {iq['type']}")
+            logger.error(f"Got unknown iq type for plugins {iq['type']}")
 
     def _handle_command(self, iq):
-        logging.debug("Received peer command iq")
+        logger.debug("Received peer command iq")
         if iq['type'] == 'set':
             self.xmpp.event('peer_command', iq)
         if iq['type'] == 'result':
             pass
         else:
-            logging.error(f"Got unknown iq type for command {iq['type']}")
+            logger.error(f"Got unknown iq type for command {iq['type']}")
 
 
 class Peer:
@@ -240,6 +242,7 @@ class StormBot(ClientXMPP):
 
     async def got_online(self, presence):
         if presence['muc']['nick'] != self.nick:
+            logger.info("Got online")
             for plugin in self.plugins:
                 plugin.got_online(presence)
 
@@ -255,9 +258,8 @@ class StormBot(ClientXMPP):
                     self.write(e.message)
                     self.write(e.usage)
                 except Exception as e:
-                    import traceback
                     self.write("Are you trying to drive me insane?")
-                    print(traceback.format_exc())
+                    logger.exception(e)
             else:
                 match = re.search("^([^ :]+):", msg['body'])
                 if match is None:
@@ -303,7 +305,7 @@ class StormBot(ClientXMPP):
             info = await self.plugin['xep_0030'].get_info(jid=f"{self.room}/{nick}")
             return StormbotPeering.namespace in info['disco_info']['features']
         except IqError as e:
-            logging.error(f"Couldn't check if {self.room}/{nick} is a peer: {e.iq['error']['condition']}")
+            logger.error(f"Couldn't check if {self.room}/{nick} is a peer: {e.iq['error']['condition']}")
             return False
 
     def _peer_send(self, peer, msg):
@@ -333,7 +335,7 @@ class StormBot(ClientXMPP):
     def _plugins_result(self, iq):
         jid = JID(iq['from'])
         if jid.bare != self.room or jid.resource not in self._peers:
-            logging.error("Received plugin list from unknown peer")
+            logger.error("Received plugin list from unknown peer")
             return
 
         peer = self._peers[jid.resource]
@@ -365,7 +367,7 @@ class StormBot(ClientXMPP):
     async def _peer_recv_command(self, iq):
         jid = JID(iq['from'])
         if jid.bare != self.room or jid.resource not in self._peers:
-            logging.error("Received command from unknown peer")
+            logger.error("Received command from unknown peer")
             return
 
         peer = self._peers[jid.resource]
@@ -385,7 +387,7 @@ class StormBot(ClientXMPP):
                 try:
                     result = await self._command(msg, peer)
                     if result is not None:
-                        logging.info(f"Command result: {result}")
+                        logger.info(f"Command result: {result}")
                         command = iq['command']
                         reply = iq.reply()
                         et_result = ET.Element('result')
@@ -405,10 +407,10 @@ class StormBot(ClientXMPP):
                     # reply.send()
                 return
 
-        logging.error("Received command for unsupported plugin")
+        logger.error("Received command for unsupported plugin")
 
     async def _peer_connect(self, room, nick):
-        logging.info(f"Connecting to peer {self.room}/{nick}")
+        logger.info(f"Connecting to peer {self.room}/{nick}")
 
         if nick in self._peers:
             del self._peers[nick]
@@ -422,7 +424,7 @@ class StormBot(ClientXMPP):
                 self._peers[nick].add_plugin(name, version)
 
         except IqError as e:
-            logging.error(f"Couldn't connect to peer {room}/{nick}: {e.iq['error']['condition']}")
+            logger.error(f"Couldn't connect to peer {room}/{nick}: {e.iq['error']['condition']}")
 
     def get_peers(self, plugin=None):
         if plugin is None:
