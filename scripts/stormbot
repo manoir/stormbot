@@ -107,6 +107,7 @@ def main():
         choices=subloggers,
         default=[],
     )
+    parser.add_argument("--color", help="Force enable colored output", action="store_true")
     parser.add_argument('--jid', type=str, default=jid,
                         help="JID to connect with (default: %(default)s)")
     parser.add_argument('--password', type=str, default=None,
